@@ -4,23 +4,38 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
+import { AuthService } from './servicies/auth.service';
 import { User, UserSchema } from './schema/user.schema';
-import { JwtAuthService } from './jwtService.service';
-import { UserService } from './userService.service';
+import { JwtAuthService } from './servicies/jwtService.service';
+import { UserService } from './servicies/userService.service';
 import { JwtAuthGuard } from './guards/JwtAuthGuard.guard';
-import { MailService } from './mailService.service'; // Import MailService
+import { MailService } from './servicies/mailService.service'; // Import MailService
 import { EmailVerificationService } from 'src/utils';
+import { Algorithm } from 'jsonwebtoken'; // Add this import
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.secret'),
-        signOptions: { expiresIn: '1h' },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const secret = configService.get<string>('jwt.secret');
+        console.log('JWT Secret:', secret);
+        
+        const expiresIn = configService.get<string>('jwt.accessToken.expiresIn');
+        console.log('JWT Expiration:', expiresIn);
+        
+        const algorithm = configService.get<string>('jwt.accessToken.algorithm');
+        console.log('JWT Algorithm:', algorithm);
+        
+        return {
+          secret,
+          signOptions: {
+            expiresIn,
+            algorithm: algorithm as Algorithm,
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],
@@ -31,7 +46,7 @@ import { EmailVerificationService } from 'src/utils';
     UserService,
     JwtAuthGuard,
     EmailVerificationService,
-    MailService, // Add MailService here
+    MailService,
   ],
   exports: [AuthService, JwtAuthService, JwtAuthGuard],
 })
