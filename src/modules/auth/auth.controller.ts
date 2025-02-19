@@ -1,44 +1,69 @@
-import { Controller, Post, Body, UseGuards, Get } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
-import { RolesGuard } from './guards/roles.guard';
-import { Roles } from './decorators/roles.decorator';
-import { J } from 'vitest/dist/chunks/reporters.C4ZHgdxQ';
-import { JwtAuthGuard } from './guards/JwtAuthGuard.guard';
+import { Controller, Post, Body, Get, Query, HttpStatus, UseGuards, ValidationPipe } from '@nestjs/common';
 
+import { ApiTags, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { AuthService } from './servicies/auth.service';
+import { LoginDto } from './dto/auth.dto';
+import { JwtAuthGuard } from './guards/JwtAuthGuard.guard';
+import { ConfigService } from '@nestjs/config';
+
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService
+
+  ) {}
 
   @Post('register')
-  registerClient(@Body() registerDto: RegisterDto) {
-    return this.authService.registerClient(registerDto);
+  @ApiResponse({ status: HttpStatus.CREATED, description: 'User successfully registered' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input' })
+  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error' })
+  async register(@Body(ValidationPipe) registerData: any) {
+    const result = await this.authService.registerClient(registerData);
+    return {
+      statusCode: result.status,
+      ...result.data,
+    };
   }
 
-
-  // @UseGuards(JwtAuthGuard)
-  @Post('verify-email')
-  async verifyEmail(@Body('token') token: string) {
-    try {
-      const result = await this.authService.verifyEmail(token);
-      return result;
-    } catch (error) {
-      return {
-        statusCode: error.getStatus(),
-        message: error.message,
-      };
-    }
+  @Post('login')
+  @ApiResponse({ status: HttpStatus.OK, description: 'User successfully logged in' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid credentials' })
+  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error' })
+  async login(@Body(ValidationPipe) credentials: LoginDto) {
+    const result = await this.authService.login(credentials);
+    return {
+      statusCode: result.status,
+      ...result.data,
+    };
   }
-  // @Post('login')
-  // login(@Body() loginDto: LoginDto) {
-  //   return this.authService.login(loginDto);
-  // }
+ 
+  @Get('verify-email')
+  @ApiQuery({ name: 'token', required: true, description: 'Email verification token' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Email successfully verified' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid token' })
+  async verifyEmail(@Query('token') token: string) {
+    return await this.authService.verifyEmail(token);
+  }
 
-  // Example of protected route with role-based access
-//   @UseGuards(JwtAuthGuard, RolesGuard)
-  // @Roles('super_admin')
-  // @Post('admin-only')
-  // adminOnly() {
-  //   return { message: 'Admin only route' };
-  // }
+  @Post('forgot-password')
+  @ApiResponse({ status: HttpStatus.OK, description: 'Password reset email sent' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'User not found' })
+  @ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error' })
+  async forgotPassword(@Body('email') email: string) {
+    return await this.authService.forgetPassword(email);
+  }
+
+  @Post('reset-password')
+@ApiResponse({ status: HttpStatus.OK, description: 'Password successfully reset' })
+@ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid token or new password' })
+@ApiResponse({ status: HttpStatus.INTERNAL_SERVER_ERROR, description: 'Internal server error' })
+async resetPassword(@Body('token') token: string, @Body('newPassword') newPassword: string) {    
+  return await this.authService.resetPassword(token, newPassword);
+}
+
+  @Get('test')
+  @UseGuards(JwtAuthGuard)
+  async test() {
+    return 'hello youness ';
+  }
 }
