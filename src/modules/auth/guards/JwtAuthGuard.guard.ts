@@ -1,13 +1,20 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { Request } from 'express';
+import { Request, Response } from 'express';
+import * as cookieParser from 'cookie-parser';
 
 export enum TokenLocation {
   QUERY = 'query',
   PARAMS = 'params',
   COOKIES = 'cookies',
-  HEADERS = 'headers'
+  HEADERS = 'headers',
 }
 
 export const Token = (location: TokenLocation) => {
@@ -17,50 +24,140 @@ export const Token = (location: TokenLocation) => {
   };
 };
 
+interface TokenPayload {
+  sub: string;
+  email: string;
+}
+
 @Injectable()
-export  class JwtAuthGuard implements CanActivate {
+export class JwtAuthGuard implements CanActivate {
+  private readonly jwtConfig: any;
+
   constructor(
     private jwtService: JwtService,
     private reflector: Reflector,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    this.jwtConfig = this.configService.get('jwt');
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const handler = context.getHandler();
-    const tokenLocation = this.reflector.get<TokenLocation>('tokenLocation', handler);
+    const tokenLocation =
+      this.reflector.get<TokenLocation>('tokenLocation', handler) ||
+      TokenLocation.HEADERS;
 
     try {
-      const token = this.extractToken(request, tokenLocation);
-      if (!token) {
-        throw new UnauthorizedException('Token not found');
+      const accessToken = this.extractToken(request, tokenLocation);
+
+      if (!accessToken) {
+        throw new UnauthorizedException('Access token not found');
       }
 
-      const decoded = this.jwtService.verify(token);
-      request['decoded'] = decoded;
-      
-      return true;
+      try {
+        const decoded = this.jwtService.verify<TokenPayload>(accessToken, {
+          secret: this.jwtConfig.secret,
+          algorithms: [this.jwtConfig.accessToken.algorithm],
+        });
+        request['decoded'] = decoded;
+        return true;
+      } catch (error) {
+        if (error.name === 'TokenExpiredError') {
+          return await this.handleTokenRefresh(request);
+        }
+        throw error;
+      }
     } catch (error) {
-      throw new UnauthorizedException('Invalid token');
+      console.error('Error in canActivate:', error);
+      throw new UnauthorizedException(error.message || 'Invalid token');
     }
   }
 
-  private extractToken(request: Request, location: TokenLocation): string | undefined {
+  private async handleTokenRefresh(request: Request): Promise<boolean> {
+    console.log('Checking for refresh token...');
+    console.log('Cookies received:', request.cookies);
+
+    const refreshToken = request.cookies?.refreshToken;
+    if (!refreshToken) {
+      console.error('No refresh token found in cookies');
+      throw new UnauthorizedException('Refresh token not found');
+    }
+
+    try {
+      console.log('Verifying refresh token...');
+      const decoded = this.jwtService.verify<TokenPayload>(refreshToken, {
+        secret: this.jwtConfig.secret,
+        algorithms: [this.jwtConfig.refreshToken.algorithm],
+      });
+
+      console.log('Decoded refresh token:', decoded);
+
+      const newAccessToken = this.jwtService.sign(
+        { sub: decoded.sub, email: decoded.email },
+        {
+          secret: this.jwtConfig.secret,
+          algorithm: this.jwtConfig.accessToken.algorithm,
+          expiresIn: this.jwtConfig.accessToken.expiresIn,
+        },
+      );
+
+      console.log('New access token generated:', newAccessToken);
+
+      const response = request.res as Response;
+      response.setHeader('Authorization', `Bearer ${newAccessToken}`);
+      response.cookie('accessToken', newAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: this.parseDuration(this.jwtConfig.accessToken.expiresIn),
+      });
+
+      request['decoded'] = decoded;
+      return true;
+    } catch (error) {
+      console.error('Invalid refresh token:', error);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  private extractToken(
+    request: Request,
+    location: TokenLocation,
+  ): string | undefined {
     switch (location) {
       case TokenLocation.QUERY:
         return request.query.token as string;
-      
       case TokenLocation.PARAMS:
         return request.params.token;
-      
       case TokenLocation.COOKIES:
-        return request.cookies?.refreshToken;
-      
+        return request.cookies?.accessToken;
       case TokenLocation.HEADERS:
         const authHeader = request.headers.authorization;
         return authHeader ? authHeader.split(' ')[1] : undefined;
-      
       default:
         return undefined;
+    }
+  }
+
+  private parseDuration(duration: string): number {
+    const match = duration.match(/^(\d+)([smhd])$/);
+    if (!match) return 900000;
+
+    const [, value, unit] = match;
+    const num = parseInt(value, 10);
+
+    switch (unit) {
+      case 's':
+        return num * 1000;
+      case 'm':
+        return num * 60 * 1000;
+      case 'h':
+        return num * 60 * 60 * 1000;
+      case 'd':
+        return num * 24 * 60 * 60 * 1000;
+      default:
+        return 900000;
     }
   }
 }
