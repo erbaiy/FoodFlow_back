@@ -2,7 +2,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
-import { LoginHistory } from '../user.interface';
+import { LoginHistory, UserMethods } from '../user.interface';
 
 @Schema({ timestamps: true })
 export class User {
@@ -71,7 +71,8 @@ export class User {
   };
 }
 
-export type UserDocument = User & Document;
+export type UserDocument = User & Document & UserMethods;
+
 export const UserSchema = SchemaFactory.createForClass(User);
 
 UserSchema.pre('save', async function(next) {
