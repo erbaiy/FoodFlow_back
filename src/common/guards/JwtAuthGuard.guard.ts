@@ -76,9 +76,11 @@ export class JwtAuthGuard implements CanActivate {
 
   private async handleTokenRefresh(request: Request): Promise<boolean> {
     console.log('Checking for refresh token...');
-    console.log('Cookies received:', request.cookies);
-
+    console.log('All cookies received:', request.cookies); // Log all cookies
+  
     const refreshToken = request.cookies?.refreshToken;
+    console.log('Refresh token from cookies:', refreshToken);
+  
     if (!refreshToken) {
       console.error('No refresh token found in cookies');
       throw new UnauthorizedException('Refresh token not found');

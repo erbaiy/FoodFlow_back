@@ -4,12 +4,12 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
-import { AuthService } from './servicies/auth.service';
+import { AuthService } from './services/auth.service';
 import { User, UserSchema } from './schema/user.schema';
-import { JwtAuthService } from './servicies/jwtService.service';
-import { UserService } from './servicies/userService.service';
-import { JwtAuthGuard } from './guards/JwtAuthGuard.guard';
-import { MailService } from './servicies/mailService.service'; // Import MailService
+import { JwtAuthService } from './services/jwtService.service';
+import { UserService } from './services/userService.service';
+import { JwtAuthGuard } from '../../common/guards/JwtAuthGuard.guard';
+import { MailService } from './services/mailService.service'; // Import MailService
 import { EmailVerificationService } from 'src/utils';
 import { Algorithm } from 'jsonwebtoken'; // Add this import
 
@@ -21,13 +21,17 @@ import { Algorithm } from 'jsonwebtoken'; // Add this import
       useFactory: async (configService: ConfigService) => {
         const secret = configService.get<string>('jwt.secret');
         console.log('JWT Secret:', secret);
-        
-        const expiresIn = configService.get<string>('jwt.accessToken.expiresIn');
+
+        const expiresIn = configService.get<string>(
+          'jwt.accessToken.expiresIn',
+        );
         console.log('JWT Expiration:', expiresIn);
-        
-        const algorithm = configService.get<string>('jwt.accessToken.algorithm');
+
+        const algorithm = configService.get<string>(
+          'jwt.accessToken.algorithm',
+        );
         console.log('JWT Algorithm:', algorithm);
-        
+
         return {
           secret,
           signOptions: {

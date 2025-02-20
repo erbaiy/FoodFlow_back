@@ -15,7 +15,9 @@ export interface User extends Document {
   };
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
-
+export interface UserMethods {
+  comparePassword(candidatePassword: string): Promise<boolean>;
+}
 export interface LoginHistory {
   fingerprint: string;
   location: string;

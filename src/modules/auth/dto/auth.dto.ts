@@ -1,43 +1,68 @@
-// src/auth/dto/auth.dto.ts
-import { IsString, IsEmail, MinLength, Matches, IsEnum, IsPhoneNumber, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsNotEmpty } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
-  @IsString()
-  @MinLength(3)
-  fullName: string;
-
+  @ApiProperty({
+    example: 'john@example.com',
+    description: 'The email address of the user',
+  })
   @IsEmail()
+  @IsNotEmpty()
   email: string;
 
+  @ApiProperty({
+    example: 'password123',
+    description: 'The password for the account',
+  })
   @IsString()
   @MinLength(8)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/, {
-    message: 'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number'
-  })
+  @IsNotEmpty()
   password: string;
-  @IsOptional()
-  _id: string;
 
-  // @IsEnum(['client', 'livreur', 'gestionnaire', 'super_admin'])
-  // role: string;
-
+  @ApiProperty({
+    example: 'John Doe',
+    description: 'The full name of the user',
+  })
   @IsString()
-  address: string;
-
-  @IsPhoneNumber()
-  phoneNumber: string;
+  @IsNotEmpty()
+  fullName: string;
 }
 
 export class LoginDto {
+  @ApiProperty({
+    example: 'john@example.com',
+    description: 'The email address of the user',
+  })
   @IsEmail()
+  @IsNotEmpty()
   email: string;
 
+  @ApiProperty({
+    example: 'password123',
+    description: 'The password for the account',
+  })
   @IsString()
+  @IsNotEmpty()
   password: string;
+}
 
-  @IsString()
-  fingerprint: string;
+export class ForgotPasswordDto {
+  @ApiProperty({
+    example: 'john@example.com',
+    description: 'The email address of the user',
+  })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}
 
+export class ResetPasswordDto {
+  @ApiProperty({
+    example: 'newPassword123',
+    description: 'The new password for the account',
+  })
   @IsString()
-  location: string;
+  @MinLength(8)
+  @IsNotEmpty()
+  newPassword: string;
 }

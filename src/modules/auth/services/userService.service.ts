@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { pick } from 'lodash';
-import { UserDocument,User } from './schema/user.schema';
+import { User, UserDocument } from '../schema/user.schema';
 
 @Injectable()
 export class UserService {
@@ -45,5 +45,9 @@ export class UserService {
         } catch (error) {
             return { success: false, error: error.message };
         }
+    }
+
+    async findByEmail(email: string): Promise<UserDocument> {
+        return this.userModel.findOne({ email });
     }
 }
