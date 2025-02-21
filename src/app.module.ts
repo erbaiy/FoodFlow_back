@@ -4,6 +4,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './modules/auth/auth.module';
 import {databaseConfig, jwtConfig, mailConfig} from './config/index';
+import { RestaurationModule } from './modules/resto/resto.module';
+import { MenuItemModule } from './modules/menu-item/menu-item.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import {databaseConfig, jwtConfig, mailConfig} from './config/index';
       }),
     }),
     AuthModule,
+    RestaurationModule,
+    MenuItemModule
   ],
 })
 export class AppModule {}
