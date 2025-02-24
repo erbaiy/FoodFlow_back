@@ -1,60 +1,60 @@
-// src/modules/menu-item/schema/menu-item.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema } from 'mongoose';
+import { Document } from 'mongoose';
+import { MENU_ITEM_CATEGORIES, MenuItemCategory } from '../constants/menu-item.constants';
 
 @Schema({
-    timestamps: true
+    timestamps: true, // Automatically adds `createdAt` and `updatedAt` fields
+    collection: 'menuItems',
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 })
 export class MenuItem {
-    @Prop({ 
+    @Prop({
         required: [true, 'Name is required'],
-        trim: true
+        trim: true,
+        minlength: [2, 'Name must be at least 2 characters'],
+        maxlength: [50, 'Name cannot exceed 50 characters'],
+        unique: true,
+        index: true
     })
     name: string;
 
-    @Prop({ 
+    @Prop({
         required: [true, 'Description is required'],
-        trim: true
+        trim: true,
+        minlength: [10, 'Description must be at least 10 characters'],
+        maxlength: [500, 'Description cannot exceed 500 characters']
     })
     description: string;
 
-    @Prop({ 
+    @Prop({
         required: [true, 'Price is required'],
-        min: [0, 'Price cannot be negative']
+        min: [0, 'Price cannot be negative'],
+        type: Number
     })
     price: number;
 
-    @Prop({
-        validate: {
-            validator: function(v: string) {
-                if (!v) return true;
-                const urlPattern = new RegExp(
-                    '^(https?:\\/\\/)?'+ 
-                    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+
-                    '((\\d{1,3}\\.){3}\\d{1,3}))'+ 
-                    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+
-                    '(\\?[;&a-z\\d%_.~+=-]*)?'+
-                    '(\\#[-a-z\\d_]*)?$','i'
-                );
-                return urlPattern.test(v);
-            },
-            message: props => `${props.value} is not a valid URL for image`
-        }
-    })
-    image: string;
+    @Prop()
+    image?: string;
 
-    @Prop({ 
-        default: true 
+    @Prop({
+        required: [true, 'Category is required'],
+        enum: {
+            values: MENU_ITEM_CATEGORIES,
+            message: '{VALUE} is not a valid category'
+        },
+        index: true
+    })
+    category: MenuItemCategory;
+
+    @Prop({
+        default: true, // Default value for `isAvailable`
+        type: Boolean
     })
     isAvailable: boolean;
-
-    @Prop({ 
-        type: String,
-        required: [true, 'Category is required'],
-        enum: ['appetizer', 'main', 'dessert', 'beverage']
-    })
-    category: string;
 }
 
 export type MenuItemDocument = MenuItem & Document;
 export const MenuItemSchema = SchemaFactory.createForClass(MenuItem);
+
+MenuItemSchema.index({ category: 1, name: 1 });
