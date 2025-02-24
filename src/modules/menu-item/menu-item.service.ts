@@ -109,6 +109,23 @@ export class MenuItemService {
     }
 
     /**
+     * enable menu item
+     */
+     async enableMenuItem(id: string): Promise<void> {
+        const menuItem = await this.findById(id);
+        menuItem.isAvailable = true;
+        await menuItem.save();
+    }
+    /**
+     * disable menu item
+     */
+     async disableMenuItem(id: string): Promise<void> {
+        const menuItem = await this.findById(id);
+        menuItem.isAvailable = false;
+        await menuItem.save();
+    }
+
+    /**
      * Helper: Find menu item by ID or throw NotFoundException
      */
     private async findById(id: string): Promise<MenuItemDocument> {

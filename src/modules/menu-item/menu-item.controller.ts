@@ -12,6 +12,7 @@ import {
   HttpStatus,
   UseInterceptors,
   UploadedFile,
+  Put,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -164,4 +165,17 @@ export class MenuItemController {
       data: { message: 'Menu item deleted successfully', deleted: true },
     };
   }
+
+  @Put(':id/enable')
+  async enableMenuItem(@Param('id') id: string)
+  {
+    await this.menuItemService.enableMenuItem(id);
+  }
+
+  @Put(':id/disable')
+  async disableMenuItem(@Param('id') id: string)
+  {
+    await this.menuItemService.disableMenuItem(id);
+  }
+
 }
