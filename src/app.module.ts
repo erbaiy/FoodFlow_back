@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './modules/auth/auth.module';
-import {databaseConfig, jwtConfig, mailConfig} from './config/index';
+import {databaseConfig, jwtConfig, mailConfig} from './common/config/index';
 import { RestaurationModule } from './modules/resto/resto.module';
 import { MenuItemModule } from './modules/menu-item/menu-item.module';
 
