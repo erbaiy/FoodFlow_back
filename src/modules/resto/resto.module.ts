@@ -13,9 +13,10 @@ import { MenuItemModule } from "../menu-item/menu-item.module";
                 schema: RestaurantSchema 
             }
         ]),
-        MenuItemModule
+        MenuItemModule,  
     ],
     controllers: [RestaurantController],
     providers: [RestaurantService],
+    exports: [RestaurantService]
 })
 export class RestaurationModule {}
