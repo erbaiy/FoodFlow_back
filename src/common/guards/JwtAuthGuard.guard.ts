@@ -15,6 +15,8 @@ export enum TokenLocation {
   PARAMS = 'params',
   COOKIES = 'cookies',
   HEADERS = 'headers',
+
+
 }
 
 export const Token = (location: TokenLocation) => {
@@ -85,7 +87,7 @@ export class JwtAuthGuard implements CanActivate {
       console.error('No refresh token found in cookies');
       throw new UnauthorizedException('Refresh token not found');
     }
-
+      console.log('rf')
     try {
       console.log('Verifying refresh token...');
       const decoded = this.jwtService.verify<TokenPayload>(refreshToken, {
