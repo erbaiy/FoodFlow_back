@@ -6,6 +6,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import {databaseConfig, jwtConfig, mailConfig} from './common/config/index';
 import { RestaurationModule } from './modules/resto/resto.module';
 import { MenuItemModule } from './modules/menu-item/menu-item.module';
+import { OrderModule } from './modules/commands/order.module';
+import { SocketModule } from './modules/socket/socket.module';
 
 @Module({
   imports: [
@@ -25,7 +27,10 @@ import { MenuItemModule } from './modules/menu-item/menu-item.module';
     }),
     AuthModule,
     RestaurationModule,
-    MenuItemModule
+    MenuItemModule,
+    OrderModule,
+    SocketModule,
+
   ],
 })
 export class AppModule {}
