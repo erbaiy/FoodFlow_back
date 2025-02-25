@@ -65,7 +65,9 @@ export class OrderService {
       });
 
       const savedOrder = await newOrder.save();
-      return await this.findOrderById(savedOrder._id.toString());
+      const Order= await this.findOrderById(savedOrder._id.toString());
+      this.socketGateway.notifyRestaurantsManager(createOrderDto.restaurant, Order);
+      return savedOrder;
     } catch (error) {
       if (error.name === 'ValidationError') {
         throw new BadRequestException(error.message);

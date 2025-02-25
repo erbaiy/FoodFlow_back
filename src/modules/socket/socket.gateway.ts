@@ -72,4 +72,23 @@ notifyDeliverer(delivererId: string, order: any) {
     }
     this.logger.warn(`Client ${clientId} not found in clientMap.`);
   }
+
+  //  Notify Restaurants Manager 
+  notifyRestaurantsManager(restoManager: string, order: any) {
+  this.logger.log(`Notifying restaurant manager ${restoManager} about order ${order._id}`);
+  this.server.to(restoManager).emit('orderUpdate', {
+    orderId: order._id,
+    status: order.status,
+  });
+  
+  // Notify when a new command is created
+  if (order.status === 'created' || order.status === 'new') {
+    this.server.to(restoManager).emit('newCommand', {
+      orderId: order._id,
+      status: order.status,
+      createdAt: order.createdAt || new Date(),
+    });
+    this.logger.log(`New command notification sent to restaurant manager ${restoManager}`);
+  }}
+
 }
