@@ -56,6 +56,7 @@ import { plainToClass } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreateRestaurantDto } from './dto/register.dto';
 import { restaurantMulterConfig } from 'src/common/config/multer.config';
+import { Roles } from 'src/common/decorators/roles.decorator';
 
 
 
@@ -105,34 +106,34 @@ export class AuthController {
     return this.authService.refreshToken(refreshToken, response);
   }
 
-  @Post('logout')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'User logout' })
-  async logout(@Res({ passthrough: true }) response: Response) {
-    // Clear both tokens
-    response.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+  // @Post('logout')
+  // @HttpCode(HttpStatus.OK)
+  // @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @ApiOperation({ summary: 'User logout' })
+  // async logout(@Res({ passthrough: true }) response: Response) {
+  //   // Clear both tokens
+  //   response.clearCookie('refreshToken', {
+  //     httpOnly: true,
+  //     secure: process.env.NODE_ENV === 'production',
+  //     sameSite: 'strict',
+  //     path: '/',
+  //   });
 
-    response.clearCookie('accessToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+  //   response.clearCookie('accessToken', {
+  //     httpOnly: true,
+  //     secure: process.env.NODE_ENV === 'production',
+  //     sameSite: 'strict',
+  //     path: '/',
+  //   });
 
-    return {
-      status: HttpStatus.OK,
-      data: {
-        message: 'Successfully logged out',
-      },
-    };
-  }
+  //   return {
+  //     status: HttpStatus.OK,
+  //     data: {
+  //       message: 'Successfully logged out',
+  //     },
+  //   };
+  // }
 
   // Protected route example
   @Get('protected')
@@ -161,11 +162,12 @@ export class AuthController {
   })
   @ApiBody({ type: RegisterDto })
   async register(
-    @Body(new ValidationPipe()) registerDto: RegisterDto,
+    @Body(new ValidationPipe()) registerDto: RegisterDto
   ): Promise<AuthResponse> {
     return this.authService.registerClient(registerDto);
   }
 
+  
   @Post('register/restaurant')
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -257,4 +259,27 @@ export class AuthController {
   ): Promise<{ message: string; statusCode: number }> {
     return this.authService.resetPassword(token, newPassword);
   }
+  @UseGuards(JwtAuthGuard)
+  @Get('gestionnaire')
+  @Roles('livreur') // Seul les gestionnaires peuvent accéder à cette route
+  getAdminDashboard() {
+    return 'gestionnaire dashboard';
+  }
+
+
+@Get('me')
+@UseGuards(JwtAuthGuard)
+async getMe(@Req() req: Request) {
+  const user = await this.authService.getUserById(req['decoded'].sub);
+  return { status: HttpStatus.OK, data: user };
+}
+
+@Post('logout')
+@UseGuards(JwtAuthGuard)
+async logout(@Res() res: Response) {
+  res.clearCookie('accessToken');
+  res.clearCookie('refreshToken');
+  return res.send({ message: 'Logged out' });
+}
+
 }

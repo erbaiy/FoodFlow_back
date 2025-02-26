@@ -47,7 +47,7 @@ export class AuthService {
     this.jwtConfig = this.configService.get('jwt');
   }
 
-  private async generateTokens(payload: { sub: string; email: string }) {
+  private async generateTokens(payload: { sub: string; email: string; role: string }) {
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.jwtConfig.secret,
       algorithm: this.jwtConfig.accessToken.algorithm,
@@ -63,33 +63,28 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private setAuthCookies(
-    response: Response,
-    tokens: { accessToken: string; refreshToken: string },
-  ): void {
-    const secure = this.configService.get<string>('NODE_ENV') === 'production';
+private setAuthCookies(
+  response: Response,
+  tokens: { accessToken: string; refreshToken: string },
+): void {
+  const secure = this.configService.get<string>('NODE_ENV') === 'production';
+  response.cookie('refreshToken', tokens.refreshToken, {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+    path: '/',
+    maxAge: this.parseDuration('1d'),
+  });
 
-    // Set refresh token cookie
-    response.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: this.parseDuration('1d'),
-    });
-
-    // Set access token cookie
-    response.cookie('accessToken', tokens.accessToken, {
-      httpOnly: true,
-      secure,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: this.parseDuration(this.jwtConfig.accessToken.expiresIn),
-    });
-
-    // Set Authorization header
-    response.setHeader('Authorization', `Bearer ${tokens.accessToken}`);
-  }
+  response.cookie('accessToken', tokens.accessToken, {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+    path: '/',
+    maxAge: this.parseDuration(this.jwtConfig.accessToken.expiresIn),
+  });
+  response.setHeader('Authorization', `Bearer ${tokens.accessToken}`);
+}
 
   private parseDuration(duration: string): number {
     const match = duration.match(/^(\d+)([smhd])$/);
@@ -123,6 +118,7 @@ export class AuthService {
       const tokens = await this.generateTokens({
         sub: user._id.toString(),
         email: user.email,
+        role: user.role, // Assurez-vous que user.role est correctement récupéré
       });
 
       this.setAuthCookies(response, tokens);
@@ -135,6 +131,7 @@ export class AuthService {
         },
       };
     } catch (error) {
+      this.logger.error(`Login failed for ${credentials.email}: ${error.message}`, error.stack);
       throw this.handleLoginError(error);
     }
   }
@@ -157,6 +154,7 @@ export class AuthService {
       const tokens = await this.generateTokens({
         sub: user._id.toString(),
         email: user.email,
+        role:user.role
       });
 
       this.setAuthCookies(response, tokens);
@@ -177,8 +175,7 @@ export class AuthService {
   async registerClient(body: RegisterDto): Promise<AuthResponse> {
     try {
       const registrationResult = await this.registerAndVerifyUser(
-        body,
-        'client',
+        body
       );
       return registrationResult;
     } catch (error) {
@@ -251,10 +248,10 @@ async registerRestaurant(
       fullName: dto.fullName,
       phoneNumber: dto.phoneNumber,
       address: dto.address,
-      role: 'gestionnaire',
+      role: dto.role,
     };
 
-    const registrationResult = await this.registerAndVerifyUser(userData, 'gestionnaire');
+    const registrationResult = await this.registerAndVerifyUser(userData);
 
     if (!registrationResult.data) {
       throw new InternalServerErrorException('User registration failed');
@@ -273,6 +270,7 @@ async registerRestaurant(
       password: dto.password,
       fullName: dto.fullName,
       phoneNumber: dto.phoneNumber,
+      role: dto.role,
     };
 
     const logoPath = files.logo?.[0]?.path;
@@ -305,6 +303,7 @@ async registerRestaurant(
     const payload = {
       id: user._id.toString(),
       email: user.email,
+      role: user.role,
     };
 
     const accessToken = await this.generateAccessToken(payload);
@@ -326,6 +325,7 @@ async registerRestaurant(
   private async generateAccessToken(payload: {
     id: string;
     email: string;
+    role: string;
   }): Promise<string> {
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('jwt.secret'),
@@ -361,9 +361,8 @@ async registerRestaurant(
 
    async registerAndVerifyUser(
     userData: RegisterDto,
-    role:string,
   ): Promise<AuthResponse> {
-    const registered = await this.userService.registerUser(userData, role);
+    const registered = await this.userService.registerUser(userData);
 
     if (!registered.success) {
       throw new HttpException(registered.error, HttpStatus.BAD_REQUEST);
@@ -510,6 +509,7 @@ async registerRestaurant(
     const token = await this.generateAccessToken({
       id: user._id.toString(),
       email: user.email,
+      role: user.role,
     });
 
     const emailSent =
@@ -551,4 +551,42 @@ async registerRestaurant(
       throw new InternalServerErrorException('Failed to reset password');
     }
   }
+
+
+  async getUserById(userId: string): Promise<UserDocument> {
+  try {
+    const user = await this.userModel.findById(userId).select('-password');
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+    return user;
+  } catch (error) {
+    this.logger.error(`Error fetching user by ID: ${error.message}`, error.stack);
+    if (error instanceof HttpException) {
+      throw error;
+    }
+    throw new InternalServerErrorException('Failed to retrieve user information');
+  }
 }
+
+async logout(response: Response): Promise<void> {
+  try {
+    response.clearCookie('accessToken', {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'strict',
+    });
+    
+    response.clearCookie('refreshToken', {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'strict',
+    });
+    
+    response.removeHeader('Authorization');
+  } catch (error) {
+    this.logger.error(`Logout error: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('Failed to logout');
+  }
+} 
+ }

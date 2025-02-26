@@ -10,4 +10,4 @@ export interface AuthResponse {
     refreshToken?: string;
     error?: string;
   };
-}
+} 

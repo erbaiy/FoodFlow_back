@@ -42,6 +42,12 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   address?: string; // Add optional marker
+
+  
+  @IsNotEmpty()
+  @IsString()
+  role: string;
+
 }
 
 export class LoginDto {

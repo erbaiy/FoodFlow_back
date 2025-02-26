@@ -65,4 +65,10 @@ export class CreateRestaurantDto {
   @IsMongoId({ each: true })
   @IsOptional()
   menu?: ObjectId[];
+
+   
+  @IsNotEmpty()
+  @IsString()
+  role: string;
+
 }

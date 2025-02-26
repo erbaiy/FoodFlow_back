@@ -8,9 +8,14 @@ import { RestaurationModule } from './modules/resto/resto.module';
 import { MenuItemModule } from './modules/menu-item/menu-item.module';
 import { OrderModule } from './modules/commands/order.module';
 import { SocketModule } from './modules/socket/socket.module';
+import { RateLimiterModule } from 'nestjs-rate-limiter';
 
 @Module({
   imports: [
+    RateLimiterModule.register({
+      points: 5, // 5 requests
+      duration: 60, // per 60 seconds
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig,jwtConfig,mailConfig]
