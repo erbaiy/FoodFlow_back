@@ -12,6 +12,8 @@ import { JwtAuthGuard } from '../../common/guards/JwtAuthGuard.guard';
 import { MailService } from './services/mailService.service'; // Import MailService
 import { EmailVerificationService } from 'src/utils';
 import { Algorithm } from 'jsonwebtoken'; // Add this import
+import { RestaurantService } from '../resto/resto.service';
+import { RestaurationModule } from '../resto/resto.module';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { Algorithm } from 'jsonwebtoken'; // Add this import
       },
       inject: [ConfigService],
     }),
+    RestaurationModule
+
   ],
   controllers: [AuthController],
   providers: [
@@ -51,6 +55,7 @@ import { Algorithm } from 'jsonwebtoken'; // Add this import
     JwtAuthGuard,
     EmailVerificationService,
     MailService,
+    
   ],
   exports: [AuthService, JwtAuthService, JwtAuthGuard],
 })

@@ -12,7 +12,7 @@ export class UserService {
         @InjectModel(User.name) private userModel: Model<UserDocument>
     ) {}
 
-    async registerUser(userData: any, userRole: string): Promise<{success: boolean, user?: UserDocument, error?: string}> {
+    async registerUser(userData: any): Promise<{success: boolean, user?: UserDocument, error?: string}> {
         try {
             const emailExists = await this.userModel.findOne({ email: userData.email });
             if (emailExists) {
@@ -20,8 +20,8 @@ export class UserService {
             }
 
             const user = await this.userModel.create({
-                ...pick(userData, ['fullName', 'email', 'password', 'phoneNumber', 'address']),
-                role: userRole,
+                ...pick(userData, ['fullName', 'email', 'password', 'phoneNumber', 'address','role']),
+                
                 loginHistory: {
                     history: [],
                     lastLogin: new Date()

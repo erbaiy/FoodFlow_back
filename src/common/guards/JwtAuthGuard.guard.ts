@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -15,6 +16,8 @@ export enum TokenLocation {
   PARAMS = 'params',
   COOKIES = 'cookies',
   HEADERS = 'headers',
+
+
 }
 
 export const Token = (location: TokenLocation) => {
@@ -27,6 +30,8 @@ export const Token = (location: TokenLocation) => {
 interface TokenPayload {
   sub: string;
   email: string;
+  role: string; // Ajout du rôle dans le payload
+
 }
 
 @Injectable()
@@ -44,6 +49,7 @@ export class JwtAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const handler = context.getHandler();
+    const requiredRoles = this.reflector.get<string[]>('roles', handler); // Récupérer les rôles requis
     const tokenLocation =
       this.reflector.get<TokenLocation>('tokenLocation', handler) ||
       TokenLocation.HEADERS;
@@ -61,6 +67,14 @@ export class JwtAuthGuard implements CanActivate {
           algorithms: [this.jwtConfig.accessToken.algorithm],
         });
         request['decoded'] = decoded;
+
+        // Vérification des rôles
+        if (requiredRoles && !requiredRoles.includes(decoded.role)) {
+          console.log('Required roles:', requiredRoles);
+          console.log('Decoded role:', decoded.role);
+          throw new ForbiddenException('Insufficient permissions');
+        }
+        
         return true;
       } catch (error) {
         if (error.name === 'TokenExpiredError') {
@@ -74,6 +88,8 @@ export class JwtAuthGuard implements CanActivate {
     }
   }
 
+
+
   private async handleTokenRefresh(request: Request): Promise<boolean> {
     console.log('Checking for refresh token...');
     console.log('All cookies received:', request.cookies); // Log all cookies
@@ -85,7 +101,7 @@ export class JwtAuthGuard implements CanActivate {
       console.error('No refresh token found in cookies');
       throw new UnauthorizedException('Refresh token not found');
     }
-
+      console.log('rf')
     try {
       console.log('Verifying refresh token...');
       const decoded = this.jwtService.verify<TokenPayload>(refreshToken, {

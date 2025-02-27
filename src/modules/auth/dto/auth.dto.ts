@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsNotEmpty } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsNotEmpty, IsNumber, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
@@ -16,7 +16,7 @@ export class RegisterDto {
   })
   @IsString()
   @MinLength(8)
-  @IsNotEmpty()
+  @IsNotEmpty() // Password should not be optional for registration
   password: string;
 
   @ApiProperty({
@@ -26,6 +26,28 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   fullName: string;
+
+  @ApiProperty({
+    example: '+1234567890',
+    description: 'The phone number of the user'
+  })
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string; // Add optional marker
+
+  @ApiProperty({
+    example: '123 Main St, City, Country',
+    description: 'The address of the user'
+  })
+  @IsString()
+  @IsOptional()
+  address?: string; // Add optional marker
+
+  
+  @IsNotEmpty()
+  @IsString()
+  role: string;
+
 }
 
 export class LoginDto {
@@ -65,4 +87,54 @@ export class ResetPasswordDto {
   @MinLength(8)
   @IsNotEmpty()
   newPassword: string;
+}
+
+export class RegisterRestaurantDto extends RegisterDto {
+  @ApiProperty({
+    example: 'Restaurant Name',
+    description: 'The name of the restaurant'
+  })
+  @IsString()
+  @IsNotEmpty()
+  restaurantName: string;
+
+  @ApiProperty({
+    example: '123 Restaurant St, City, Country',
+    description: 'The address of the restaurant'
+  })
+  @IsString()
+  @IsNotEmpty()
+  address: string;
+
+  @ApiProperty({
+    example: 'A nice family restaurant',
+    description: 'Description of the restaurant'
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiProperty({
+    example: '+1234567890',
+    description: 'The phone number of the restaurant'
+  })
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+
+  @ApiProperty({
+    example: 'Italian',
+    description: 'Type of cuisine served'
+  })
+  @IsString()
+  @IsOptional()
+  cuisine?: string;
+
+  @ApiProperty({
+    example: true,
+    description: 'Whether delivery service is available'
+  })
+  @IsBoolean()
+  @IsOptional()
+  isDeliveryAvailable?: boolean;
 }

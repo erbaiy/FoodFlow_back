@@ -1,3 +1,13 @@
+
+
+
+
+
+
+
+
+
+
 import {
   Injectable,
   HttpException,
@@ -15,8 +25,10 @@ import { EmailVerificationService } from 'src/utils';
 import { MailService } from './mailService.service';
 import { LoginDto, RegisterDto } from '../dto/auth.dto';
 import { ConfigService } from '@nestjs/config';
-import { AuthResponse } from '../interfaces/authResponse';
+import { AuthResponse } from '../../../common/interfaces/authResponse';
 import { Response } from 'express';
+import { RestaurantService } from 'src/modules/resto/resto.service';
+import { CreateRestaurantDto } from '../dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -29,12 +41,13 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly restaurantService:RestaurantService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {
     this.jwtConfig = this.configService.get('jwt');
   }
 
-  private async generateTokens(payload: { sub: string; email: string }) {
+  private async generateTokens(payload: { sub: string; email: string; role: string }) {
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.jwtConfig.secret,
       algorithm: this.jwtConfig.accessToken.algorithm,
@@ -50,30 +63,28 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private setAuthCookies(response: Response, tokens: { accessToken: string; refreshToken: string }): void {
-    const secure = this.configService.get<string>('NODE_ENV') === 'production';
-    
-    // Set refresh token cookie
-    response.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: this.parseDuration('1d'),  
-      });
+private setAuthCookies(
+  response: Response,
+  tokens: { accessToken: string; refreshToken: string },
+): void {
+  const secure = this.configService.get<string>('NODE_ENV') === 'production';
+  response.cookie('refreshToken', tokens.refreshToken, {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+    path: '/',
+    maxAge: this.parseDuration('1d'),
+  });
 
-    // Set access token cookie
-    response.cookie('accessToken', tokens.accessToken, {
-      httpOnly: true,
-      secure,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: this.parseDuration(this.jwtConfig.accessToken.expiresIn),
-    });
-
-    // Set Authorization header
-    response.setHeader('Authorization', `Bearer ${tokens.accessToken}`);
-  }
+  response.cookie('accessToken', tokens.accessToken, {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+    path: '/',
+    maxAge: this.parseDuration(this.jwtConfig.accessToken.expiresIn),
+  });
+  response.setHeader('Authorization', `Bearer ${tokens.accessToken}`);
+}
 
   private parseDuration(duration: string): number {
     const match = duration.match(/^(\d+)([smhd])$/);
@@ -83,15 +94,23 @@ export class AuthService {
     const num = parseInt(value, 10);
 
     switch (unit) {
-      case 's': return num * 1000;
-      case 'm': return num * 60 * 1000;
-      case 'h': return num * 60 * 60 * 1000;
-      case 'd': return num * 24 * 60 * 60 * 1000;
-      default: return 900000;
+      case 's':
+        return num * 1000;
+      case 'm':
+        return num * 60 * 1000;
+      case 'h':
+        return num * 60 * 60 * 1000;
+      case 'd':
+        return num * 24 * 60 * 60 * 1000;
+      default:
+        return 900000;
     }
   }
 
-  async login(credentials: LoginDto, response: Response): Promise<AuthResponse> {
+  async login(
+    credentials: LoginDto,
+    response: Response,
+  ): Promise<AuthResponse> {
     try {
       const user = await this.validateUser(credentials);
       await this.checkEmailVerification(user);
@@ -99,6 +118,7 @@ export class AuthService {
       const tokens = await this.generateTokens({
         sub: user._id.toString(),
         email: user.email,
+        role: user.role, // Assurez-vous que user.role est correctement récupéré
       });
 
       this.setAuthCookies(response, tokens);
@@ -111,11 +131,15 @@ export class AuthService {
         },
       };
     } catch (error) {
+      this.logger.error(`Login failed for ${credentials.email}: ${error.message}`, error.stack);
       throw this.handleLoginError(error);
     }
   }
 
-  async refreshToken(refreshToken: string, response: Response): Promise<AuthResponse> {
+  async refreshToken(
+    refreshToken: string,
+    response: Response,
+  ): Promise<AuthResponse> {
     try {
       const decoded = await this.jwtService.verifyAsync(refreshToken, {
         secret: this.jwtConfig.secret,
@@ -130,6 +154,7 @@ export class AuthService {
       const tokens = await this.generateTokens({
         sub: user._id.toString(),
         email: user.email,
+        role:user.role
       });
 
       this.setAuthCookies(response, tokens);
@@ -149,7 +174,9 @@ export class AuthService {
 
   async registerClient(body: RegisterDto): Promise<AuthResponse> {
     try {
-      const registrationResult = await this.registerAndVerifyUser(body);
+      const registrationResult = await this.registerAndVerifyUser(
+        body
+      );
       return registrationResult;
     } catch (error) {
       this.logger.error(`Registration error: ${error.message}`, error.stack);
@@ -160,6 +187,113 @@ export class AuthService {
     }
   }
 
+ // In AuthService:
+// async registerRestaurant(
+//   body: CreateRestaurantDto,
+//   files: {
+//     logo?: Express.Multer.File[];
+//     cover?: Express.Multer.File[];
+//     banner?: Express.Multer.File[];
+//   }
+// ): Promise<AuthResponse> {
+//   try {
+//     // Register the restaurant user with the 'gestionnaire' role
+//     const registrationResult = await this.registerAndVerifyUser(
+//       body,
+//       'gestionnaire',
+//     );
+
+//     if (!registrationResult.data) {
+//       throw new InternalServerErrorException('Registration failed');
+//     }
+
+//     // Create restaurant after successful user registration
+//     await this.restaurantService.createRestaurant(body, files);
+
+//     return {
+//       status: HttpStatus.CREATED,
+//       data: {
+//         message: 'Restaurant registered successfully. Check your email for verification.',
+//         accessToken: registrationResult.data.accessToken,
+//         refreshToken: registrationResult.data.refreshToken
+//       },
+//     };
+//   } catch (error) {
+//     this.logger.error(
+//       `Restaurant registration error: ${error.message}`,
+//       error.stack,
+//     );
+
+//     return {
+//       status: HttpStatus.INTERNAL_SERVER_ERROR,
+//       data: {
+//         error: error.message || 'Registration failed'
+//       }
+//     };
+//   }
+// }
+async registerRestaurant(
+  dto: CreateRestaurantDto,
+  files: {
+    logo?: Express.Multer.File[];
+    cover?: Express.Multer.File[];
+    banner?: Express.Multer.File[];
+  },
+): Promise<AuthResponse> {
+  try {
+    // Register the user first
+    const userData = {
+      email: dto.email,
+      password: dto.password,
+      fullName: dto.fullName,
+      phoneNumber: dto.phoneNumber,
+      address: dto.address,
+      role: dto.role,
+    };
+
+    const registrationResult = await this.registerAndVerifyUser(userData);
+
+    if (!registrationResult.data) {
+      throw new InternalServerErrorException('User registration failed');
+    }
+
+    // Create restaurant with the newly created user as manager
+    const restaurantData:CreateRestaurantDto = {
+      name: dto.name,
+      cuisineType: dto.cuisineType,
+      address: dto.address,
+      location: dto.location,
+      manager: registrationResult.data.userId,
+      isApproved: dto.isApproved || false,
+      menu: dto.menu || [],
+      email: dto.email,
+      password: dto.password,
+      fullName: dto.fullName,
+      phoneNumber: dto.phoneNumber,
+      role: dto.role,
+    };
+
+    const logoPath = files.logo?.[0]?.path;
+    const bannerPath = files.banner?.[0]?.path;
+    console.log('files',files);
+
+
+
+    await this.restaurantService.createRestaurant(restaurantData, files);
+
+    return {
+      status: HttpStatus.CREATED,
+      data: {
+        message: 'Restaurant registered successfully. Check your email for verification.',
+        accessToken: registrationResult.data.accessToken,
+        refreshToken: registrationResult.data.refreshToken,
+      },
+    };
+  } catch (error) {
+    this.logger.error(`Restaurant registration error: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('Registration failed');
+  }
+}
 
 
   private async generateAuthResponse(
@@ -169,6 +303,7 @@ export class AuthService {
     const payload = {
       id: user._id.toString(),
       email: user.email,
+      role: user.role,
     };
 
     const accessToken = await this.generateAccessToken(payload);
@@ -187,21 +322,31 @@ export class AuthService {
     };
   }
 
-  private async generateAccessToken(payload: { id: string; email: string }): Promise<string> {
+  private async generateAccessToken(payload: {
+    id: string;
+    email: string;
+    role: string;
+  }): Promise<string> {
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('jwt.secret'),
       expiresIn: this.configService.get<string>('jwt.accessToken.expiresIn'),
     });
   }
 
-  private async generateRefreshToken(payload: { id: string; email: string }): Promise<string> {
+  private async generateRefreshToken(payload: {
+    id: string;
+    email: string;
+  }): Promise<string> {
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('jwt.secret'),
       expiresIn: this.configService.get<string>('jwt.refreshToken.expiresIn'),
     });
   }
 
-  private setRefreshTokenCookie(response: Response, refreshToken: string): void {
+  private setRefreshTokenCookie(
+    response: Response,
+    refreshToken: string,
+  ): void {
     const secure = this.configService.get<string>('NODE_ENV') === 'production';
     const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
@@ -214,35 +359,42 @@ export class AuthService {
     });
   }
 
-  private async registerAndVerifyUser(userData: RegisterDto): Promise<AuthResponse> {
-    const registered = await this.userService.registerUser(userData, 'client');
+   async registerAndVerifyUser(
+    userData: RegisterDto,
+  ): Promise<AuthResponse> {
+    const registered = await this.userService.registerUser(userData);
 
     if (!registered.success) {
       throw new HttpException(registered.error, HttpStatus.BAD_REQUEST);
     }
-
     if (!registered.user?._id || !registered.user?.email) {
-      throw new InternalServerErrorException('Invalid user data after registration');
+      throw new InternalServerErrorException(
+        'Invalid user data after registration',
+      );
     }
-
     const emailSent = await this.sendVerificationEmail(
       registered.user._id.toString(),
       registered.user.email,
     );
 
     if (!emailSent) {
-      throw new InternalServerErrorException('Failed to send verification email');
+      throw new InternalServerErrorException(
+        'Failed to send verification email',
+      );
     }
 
     return {
       status: HttpStatus.CREATED,
       data: {
+        userId: registered.user?.id,
         message: 'User created successfully. Check your email for verification',
       },
     };
   }
 
-  async verifyEmail(token: string): Promise<{ message: string; statusCode: number }> {
+  async verifyEmail(
+    token: string,
+  ): Promise<{ message: string; statusCode: number }> {
     if (!token) {
       throw new HttpException('No token provided', HttpStatus.BAD_REQUEST);
     }
@@ -271,7 +423,9 @@ export class AuthService {
       );
 
       if (!emailSent) {
-        throw new InternalServerErrorException('Failed to send verification email');
+        throw new InternalServerErrorException(
+          'Failed to send verification email',
+        );
       }
 
       throw new UnauthorizedException(
@@ -280,7 +434,9 @@ export class AuthService {
     }
   }
 
-  private async validateAndGetUserFromToken(token: string): Promise<UserDocument> {
+  private async validateAndGetUserFromToken(
+    token: string,
+  ): Promise<UserDocument> {
     try {
       const decoded = await this.jwtService.verifyAsync(token, {
         secret: this.configService.get<string>('jwt.secret'),
@@ -313,7 +469,10 @@ export class AuthService {
     };
   }
 
-  private async sendVerificationEmail(userId: string, email: string): Promise<boolean> {
+  private async sendVerificationEmail(
+    userId: string,
+    email: string,
+  ): Promise<boolean> {
     return this.emailVerificationService.sendEmailVerification(userId, email);
   }
 
@@ -328,12 +487,20 @@ export class AuthService {
   private handleVerificationError(error: Error): never {
     this.logger.error(`Verification error: ${error.message}`, error.stack);
     if (error.name === 'TokenExpiredError') {
-      throw new HttpException('Verification link has expired', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Verification link has expired',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    throw new HttpException('Invalid verification link', HttpStatus.BAD_REQUEST);
+    throw new HttpException(
+      'Invalid verification link',
+      HttpStatus.BAD_REQUEST,
+    );
   }
 
-  async forgetPassword(email: string): Promise<{ message: string; statusCode: number }> {
+  async forgetPassword(
+    email: string,
+  ): Promise<{ message: string; statusCode: number }> {
     const user = await this.userModel.findOne({ email });
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
@@ -342,15 +509,19 @@ export class AuthService {
     const token = await this.generateAccessToken({
       id: user._id.toString(),
       email: user.email,
+      role: user.role,
     });
 
-    const emailSent = await this.emailVerificationService.sendPasswordResetEmail(
-      user.email,
-      token,
-    );
+    const emailSent =
+      await this.emailVerificationService.sendPasswordResetEmail(
+        user.email,
+        token,
+      );
 
     if (!emailSent) {
-      throw new InternalServerErrorException('Failed to send password reset email');
+      throw new InternalServerErrorException(
+        'Failed to send password reset email',
+      );
     }
 
     return {
@@ -381,4 +552,41 @@ export class AuthService {
     }
   }
 
+
+  async getUserById(userId: string): Promise<UserDocument> {
+  try {
+    const user = await this.userModel.findById(userId).select('-password');
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+    return user;
+  } catch (error) {
+    this.logger.error(`Error fetching user by ID: ${error.message}`, error.stack);
+    if (error instanceof HttpException) {
+      throw error;
+    }
+    throw new InternalServerErrorException('Failed to retrieve user information');
+  }
 }
+
+async logout(response: Response): Promise<void> {
+  try {
+    response.clearCookie('accessToken', {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'strict',
+    });
+    
+    response.clearCookie('refreshToken', {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'strict',
+    });
+    
+    response.removeHeader('Authorization');
+  } catch (error) {
+    this.logger.error(`Logout error: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('Failed to logout');
+  }
+} 
+ }
