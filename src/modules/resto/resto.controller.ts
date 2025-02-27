@@ -12,6 +12,7 @@ import {
   UseGuards,
   UploadedFiles,
   UseInterceptors,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes } from '@nestjs/swagger';
 import CreateRestaurantDto from './dto/create-restaurant.dto';
@@ -128,4 +129,20 @@ async createRestaurant(
   ): Promise<DeleteRestaurantResponse> {
     return await this.restaurantService.deleteRestaurant(id);
   }
+
+
+
+
+  @Post('validate/:id')
+  // @Roles('super_admin') // Seul le super admin peut valider un restaurant
+  async validateRestaurant(@Param('id') id: string) {
+    return this.restaurantService.validateRestaurant(id);
+  }
+
+  @Get('me')
+  // @Roles('restaurant_manager') // Seul le gestionnaire de restaurants peut accéder à son restaurant
+  async getMyRestaurant(@Req() req: Request) {
+    return this.restaurantService.getMyRestaurant(req['decoded'].sub);
+  }
+
 }

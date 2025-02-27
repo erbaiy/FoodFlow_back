@@ -203,4 +203,70 @@ export class RestaurantService {
             };
         }
     }
+
+
+
+    async validateRestaurant(id: string): Promise<RestaurantResponse> {
+        try {
+            const restaurant = await this.restaurantModel.findById(id);
+
+            if (!restaurant) {
+                throw new NotFoundException('Restaurant not found');
+            }
+            if (restaurant.isApproved) {
+                throw new BadRequestException('Restaurant is already validated');
+            }
+
+            restaurant.isApproved = true;
+
+            const updatedRestaurant = await restaurant.save();
+
+            return {
+                status: HttpStatus.OK,
+                data: {
+                    message: 'Restaurant validated successfully',
+                    result: updatedRestaurant
+                }
+            };
+        } catch (error) {
+            return {
+                status: HttpStatus.BAD_REQUEST,
+                data: {
+                    error: error.message
+                }
+            };
+        }
+    }
+// rest magner can get his resto
+    async getMyRestaurant(userId: string): Promise<RestaurantResponse> {
+        try {
+            const restaurant = await this.restaurantModel.findOne({ manager: userId })
+                .populate('manager', 'name email')
+                .populate('menu');
+
+            if (!restaurant) {
+                throw new NotFoundException('Restaurant not found');
+            }
+
+            return {
+                status: HttpStatus.OK,
+                data: {
+                    message: 'Restaurant fetched successfully',
+                    result: restaurant
+                }
+            };
+        } catch (error) {
+            return {
+                status: HttpStatus.BAD_REQUEST,
+                data: {
+                    error: error.message
+                }
+            };
+        }
+    }
+
+    
+
+
+
 }
