@@ -112,35 +112,6 @@ export class AuthController {
     return this.authService.refreshToken(refreshToken, response);
   }
 
-  // @Post('logout')
-  // @HttpCode(HttpStatus.OK)
-  // @UseGuards(JwtAuthGuard)
-  // @ApiBearerAuth()
-  // @ApiOperation({ summary: 'User logout' })
-  // async logout(@Res({ passthrough: true }) response: Response) {
-  //   // Clear both tokens
-  //   response.clearCookie('refreshToken', {
-  //     httpOnly: true,
-  //     secure: process.env.NODE_ENV === 'production',
-  //     sameSite: 'strict',
-  //     path: '/',
-  //   });
-
-  //   response.clearCookie('accessToken', {
-  //     httpOnly: true,
-  //     secure: process.env.NODE_ENV === 'production',
-  //     sameSite: 'strict',
-  //     path: '/',
-  //   });
-
-  //   return {
-  //     status: HttpStatus.OK,
-  //     data: {
-  //       message: 'Successfully logged out',
-  //     },
-  //   };
-  // }
-
   // Protected route example
   @Get('protected')
   @UseGuards(JwtAuthGuard)

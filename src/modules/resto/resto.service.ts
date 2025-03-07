@@ -230,6 +230,91 @@ export class RestaurantService {
     }
   }
 
+  
+    //  Approuver une demande
+    async approveRestaurant(id: string): Promise<RestaurantResponse> {
+      try {
+        const restaurant = await this.restaurantModel.findById(id);
+  
+        if (!restaurant) {
+          throw new NotFoundException('Restaurant not found');
+        }
+  
+        restaurant.isApproved = true;
+        await restaurant.save();
+  
+        return {
+          status: HttpStatus.OK,
+          data: {
+            message: 'Restaurant approved successfully',
+            result: restaurant,
+          },
+        };
+      } catch (error) {
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          data: {
+            error: error.message,
+          },
+        };
+      }
+    }
+  
+      // Rejeter une demande
+    async rejectRestaurant(id: string): Promise<RestaurantResponse> {
+      try {
+        const restaurant = await this.restaurantModel.findByIdAndDelete(id);
+  
+        if (!restaurant) {
+          throw new NotFoundException('Restaurant not found');
+        }
+  
+        restaurant.isApproved = false;
+        await restaurant.save();
+  
+        return {
+          status: HttpStatus.OK,
+          data: {
+            message: 'Restaurant rejected successfully',
+            result: restaurant,
+          },
+        };
+      } catch (error) {
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          data: {
+            error: error.message,
+          },
+        };
+      }
+  
+    
+  }
+  // Obtenir la liste des demandes d'inscription
+  async getPendingRestaurants(): Promise<RestaurantsResponse> {
+    try {
+      const restaurants = await this.restaurantModel.find({ isApproved: false }).exec();
+  
+      return {
+        status: HttpStatus.OK,
+        data: {
+          message: 'Pending restaurants fetched successfully',
+          result: restaurants,
+          count: restaurants.length,
+        },
+      };
+    } catch (error) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        data: {
+          error: error.message,
+        },
+      };
+    }
+  }
+
+
+
   /**
    * Get all restaurants
    * @returns Promise with all restaurants

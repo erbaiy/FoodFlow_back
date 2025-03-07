@@ -163,4 +163,57 @@ async getManagerProfile(@Param('id', ParseMongoIdPipe) id: string) {
   return await this.restaurantService.getManagerProfile(userId);
 }
 
+
+
+//  Approuver une demande
+  
+  @Put(':id/approve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Approve restaurant by ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Restaurant approved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Restaurant not found',
+  })
+  async approveRestaurant(
+    @Param('id', ParseMongoIdPipe) id: string,
+  ): Promise<RestaurantResponse> {
+    return await this.restaurantService.approveRestaurant(id);
+  }
+
+  // Rejeter une demande
+
+  @Delete(':id/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reject restaurant by ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Restaurant rejected successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Restaurant not found',
+  })
+  async rejectRestaurant(
+    @Param('id', ParseMongoIdPipe) id: string,
+  ): Promise<RestaurantResponse> {
+    return await this.restaurantService.rejectRestaurant(id);
+  }
+
+
+  // Obtenir la liste des demandes d'inscription
+  @Get('/resto/pending')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get pending restaurants' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Pending restaurants fetched successfully',
+  })
+  async getPendingRestaurants(): Promise<RestaurantsResponse> {
+    console.log('getPendingRestaurants');
+    return await this.restaurantService.getPendingRestaurants();
+  }
 }
