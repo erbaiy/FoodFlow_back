@@ -5,6 +5,12 @@ export interface AuthResponse {
   status: HttpStatus;
   data: {
     message?: string;
+    user?: {
+      id: string;
+      email: string;
+      fullName: string;
+      role: string;
+    };
     userId?: string; // Corrected line
     accessToken?: string;
     refreshToken?: string;

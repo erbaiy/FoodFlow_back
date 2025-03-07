@@ -56,7 +56,7 @@ export class CreateRestaurantDto {
   @IsOptional()
   isApproved?: boolean;
 
-
+  @IsOptional()
   @IsMongoId()
   manager: string;
 

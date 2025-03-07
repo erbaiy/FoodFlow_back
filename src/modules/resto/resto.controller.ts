@@ -31,6 +31,18 @@ import { restaurantMulterConfig } from 'src/common/config/multer.config';
 @Controller('restaurants')
 export class RestaurantController {
   constructor(private readonly restaurantService: RestaurantService) {}
+
+  //   get all resto  for client 
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get all restaurants' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Restaurants fetched successfully',
+  })
+  async getAllRestaurants(): Promise<RestaurantsResponse> {
+    return await this.restaurantService.getAllRestaurants();
+  }
   
   // Create a New Restaurant Controller function
   @Post()
@@ -58,7 +70,8 @@ async createRestaurant(
     banner?: Express.Multer.File[]; // Add this line
   }
 ): Promise<RestaurantResponse> {
-
+  
+  console.log("incoming file",files)
   return await this.restaurantService.createRestaurant(createRestaurantDto, files);
 }
   @Put(':id')
@@ -75,7 +88,7 @@ async createRestaurant(
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'logo', maxCount: 1 },
-      { name: 'cover', maxCount: 1 }
+      { name: 'banner', maxCount: 1 }
     ], restaurantMulterConfig)
   )
   async updateRestaurant(
@@ -112,6 +125,9 @@ async createRestaurant(
   }
 
 
+
+
+
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete restaurant by ID' })
@@ -128,4 +144,23 @@ async createRestaurant(
   ): Promise<DeleteRestaurantResponse> {
     return await this.restaurantService.deleteRestaurant(id);
   }
+
+
+@Get('restaurant-manager-profile/:id')
+@HttpCode(HttpStatus.OK)
+@ApiOperation({ summary: 'Get restaurant manager profile by ID' })
+@ApiResponse({
+  status: HttpStatus.OK,
+  description: 'Manager profile fetched successfully',
+})
+@ApiResponse({
+  status: HttpStatus.BAD_REQUEST,
+  description: 'Bad request',
+})
+async getManagerProfile(@Param('id', ParseMongoIdPipe) id: string) {
+  const userId = id;
+  console.log("userId_uduu", userId)
+  return await this.restaurantService.getManagerProfile(userId);
+}
+
 }

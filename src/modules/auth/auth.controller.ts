@@ -28,6 +28,9 @@ import {
   Req,
   HttpException,
   UploadedFiles,
+  Delete,
+  Param,
+  Put,
 } from '@nestjs/common';
 import { AuthService } from './services/auth.service';
 import {
@@ -57,13 +60,16 @@ import { validate } from 'class-validator';
 import { CreateRestaurantDto } from './dto/register.dto';
 import { restaurantMulterConfig } from 'src/common/config/multer.config';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { UserService } from './services/userService.service';
 
 
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService,
+    private readonly userService:UserService
+  ) {}
 
  
 
@@ -186,7 +192,8 @@ export class AuthController {
     },
     @Res() response: Response,
   ): Promise<void> {
-
+    console.log('file',files)
+    
     try {
       const validatedDto = plainToClass(CreateRestaurantDto, registerDto);
       const errors = await validate(validatedDto);
@@ -217,11 +224,12 @@ export class AuthController {
     status: HttpStatus.BAD_REQUEST,
     description: 'Invalid or expired token',
   })
-  async verifyEmail(
+async verifyEmail(
     @Query('token') token: string,
-  ): Promise<{ message: string; statusCode: number }> {
+): Promise<{ message: string; statusCode: number }> {
     return this.authService.verifyEmail(token);
-  }
+}
+
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
@@ -281,5 +289,37 @@ async logout(@Res() res: Response) {
   res.clearCookie('refreshToken');
   return res.send({ message: 'Logged out' });
 }
-
+// super admin
+@Get('users')
+async getUsers() {
+  return this.userService.getUsers()    ;
 }
+
+
+
+// update user role
+@Put('users/:id/role')
+async updateUserRole(@Param('id') id: string, @Body('role') role: string) {
+  return this.userService.updateUserRole(id, role);
+}
+//  delter user
+@Delete('users/:id')
+async deleteUser(@Param('id') id: string) {
+  return this.userService.deleteUser(id);
+}
+
+
+  // Récupérer les gestionnaires de restaurants avec leurs restaurants associés :
+
+  @Get('restaurants')
+  async getRestaurantsWithManagers() {
+    return this.authService.getRestaurantsWithManagers();
+  }
+  
+
+ }
+
+
+
+
+

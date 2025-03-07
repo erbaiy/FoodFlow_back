@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JwtAuthService } from 'src/modules/auth/services/jwtService.service';
 import { MailService } from 'src/modules/auth/services/mailService.service';
 
-@Injectable() // Add this decorator
+@Injectable()
 export class EmailVerificationService {
   constructor(
     private readonly jwtService: JwtAuthService,
@@ -15,7 +15,9 @@ export class EmailVerificationService {
       const baseUrl = process.env.FRONT_APP_HOST.startsWith('http')
         ? process.env.FRONT_APP_HOST
         : `https://${process.env.FRONT_APP_HOST}`;
-      const link = `${baseUrl}/verify-email?token=${token}`;
+
+      // Use URL parameter for the token
+      const link = `${baseUrl}/verify-email/${token}`;
 
       const htmlContent = `
         <!DOCTYPE html>
@@ -79,12 +81,14 @@ export class EmailVerificationService {
       return false;
     }
   }
+
   async sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
     try {
       const baseUrl = process.env.FRONT_APP_HOST.startsWith('http')
         ? process.env.FRONT_APP_HOST
         : `https://${process.env.FRONT_APP_HOST}`;
-      const link = `${baseUrl}/reset-password?token=${token}`;
+      // Use URL parameter for the token in password reset as well
+      const link = `${baseUrl}/reset-password/${token}`;
 
       const htmlContent = `
         <!DOCTYPE html>
@@ -144,7 +148,7 @@ export class EmailVerificationService {
       console.log('Email sent successfully');
       return true;
     } catch (error) {
-      console.error('Email verification error:', error);
+      console.error('Password reset email sending error:', error);
       return false;
     }
   }
