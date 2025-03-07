@@ -31,6 +31,7 @@ import {
   MenuItemsResponse,
   DeleteMenuItemResponse,
 } from 'src/common/interfaces/menu-item/menu-item-crud.interface';
+import { Types } from 'mongoose';
 
 @ApiTags('Menu Items')
 @Controller('menu-items')
@@ -39,19 +40,22 @@ export class MenuItemController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new menu item' })
+  @ApiOperation({ summary: 'Create a new menu item for a restaurant' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({
     status: HttpStatus.CREATED,
     description: 'Menu item created successfully',
   })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Bad request' })
-  @UseInterceptors(FileInterceptor('image', menuItemMulterConfig)) // Use the correct config
+  @UseInterceptors(FileInterceptor('image', menuItemMulterConfig))
   async create(
-    @Body() createMenuItemDto: CreateMenuItemDto,
+    @Query('restoId') restoId: string,
+        @Body() createMenuItemDto: CreateMenuItemDto,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<MenuItemResponse> {
-    const result = await this.menuItemService.create(createMenuItemDto, file);
+    console.log('Received restoId:', restoId);
+    const objectRestoId = new Types.ObjectId(restoId);
+    const result = await this.menuItemService.create(objectRestoId, createMenuItemDto, file);
     return {
       status: HttpStatus.CREATED,
       data: { message: 'Menu item created successfully', result },
@@ -178,4 +182,30 @@ export class MenuItemController {
     await this.menuItemService.disableMenuItem(id);
   }
 
+
+
+    /**
+     * get resto menu item by resto id
+     */
+
+    @Get('/:id')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Get menu item by resto id' })
+    @ApiResponse({
+      status: HttpStatus.OK,
+      description: 'Menu item fetched successfully',
+    })
+    @ApiResponse({
+      status: HttpStatus.NOT_FOUND,
+      description: 'Menu item not found',
+    })
+    async findRestoMenuItems(
+      @Param('id', ParseMongoIdPipe) id: string,
+    ): Promise<MenuItemsResponse> {
+      const result = await this.menuItemService.findRestoMenuItems(id);
+      return {
+        status: HttpStatus.OK,
+        data: { message: 'Menu item fetched successfully', result },
+      };
+    }
 }

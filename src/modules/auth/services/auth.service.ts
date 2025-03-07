@@ -15,6 +15,8 @@ import {
   Logger,
   UnauthorizedException,
   InternalServerErrorException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { UserService } from './userService.service';
 import { JwtService } from '@nestjs/jwt';
@@ -41,8 +43,9 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly restaurantService:RestaurantService,
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @Inject(forwardRef(() => RestaurantService))
+    private readonly restaurantService: RestaurantService,
+        @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {
     this.jwtConfig = this.configService.get('jwt');
   }
@@ -127,6 +130,12 @@ private setAuthCookies(
         status: HttpStatus.OK,
         data: {
           message: 'Login successful',
+          user: {
+            id: user._id.toString(),
+            fullName: user.fullName,
+            email: user.email,
+            role: user.role,
+          },
           accessToken: tokens.accessToken,
         },
       };
@@ -170,7 +179,7 @@ private setAuthCookies(
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
-  //
+  
 
   async registerClient(body: RegisterDto): Promise<AuthResponse> {
     try {
@@ -187,51 +196,7 @@ private setAuthCookies(
     }
   }
 
- // In AuthService:
-// async registerRestaurant(
-//   body: CreateRestaurantDto,
-//   files: {
-//     logo?: Express.Multer.File[];
-//     cover?: Express.Multer.File[];
-//     banner?: Express.Multer.File[];
-//   }
-// ): Promise<AuthResponse> {
-//   try {
-//     // Register the restaurant user with the 'gestionnaire' role
-//     const registrationResult = await this.registerAndVerifyUser(
-//       body,
-//       'gestionnaire',
-//     );
-
-//     if (!registrationResult.data) {
-//       throw new InternalServerErrorException('Registration failed');
-//     }
-
-//     // Create restaurant after successful user registration
-//     await this.restaurantService.createRestaurant(body, files);
-
-//     return {
-//       status: HttpStatus.CREATED,
-//       data: {
-//         message: 'Restaurant registered successfully. Check your email for verification.',
-//         accessToken: registrationResult.data.accessToken,
-//         refreshToken: registrationResult.data.refreshToken
-//       },
-//     };
-//   } catch (error) {
-//     this.logger.error(
-//       `Restaurant registration error: ${error.message}`,
-//       error.stack,
-//     );
-
-//     return {
-//       status: HttpStatus.INTERNAL_SERVER_ERROR,
-//       data: {
-//         error: error.message || 'Registration failed'
-//       }
-//     };
-//   }
-// }
+ 
 async registerRestaurant(
   dto: CreateRestaurantDto,
   files: {
@@ -589,4 +554,21 @@ async logout(response: Response): Promise<void> {
     throw new InternalServerErrorException('Failed to logout');
   }
 } 
- }
+
+
+
+async getRestaurantsWithManagers(){
+  try {
+    const restaurants = await this.restaurantService.getRestaurantsWithManagers();
+    return restaurants;
+  } catch (error) {
+    this.logger.error(`Error fetching restaurants with managers: ${error.message}`, error.stack);
+    throw new InternalServerErrorException('Failed to fetch restaurants with managers');
+  }
+
+
+}
+
+
+
+}
