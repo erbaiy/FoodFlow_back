@@ -9,15 +9,12 @@ import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response } from 'express';
-import * as cookieParser from 'cookie-parser';
 
 export enum TokenLocation {
   QUERY = 'query',
   PARAMS = 'params',
   COOKIES = 'cookies',
   HEADERS = 'headers',
-
-
 }
 
 export const Token = (location: TokenLocation) => {
@@ -31,7 +28,6 @@ interface TokenPayload {
   sub: string;
   email: string;
   role: string; // Ajout du rôle dans le payload
-
 }
 
 @Injectable()
@@ -74,7 +70,7 @@ export class JwtAuthGuard implements CanActivate {
           console.log('Decoded role:', decoded.role);
           throw new ForbiddenException('Insufficient permissions');
         }
-        
+
         return true;
       } catch (error) {
         if (error.name === 'TokenExpiredError') {
@@ -88,20 +84,18 @@ export class JwtAuthGuard implements CanActivate {
     }
   }
 
-
-
   private async handleTokenRefresh(request: Request): Promise<boolean> {
     console.log('Checking for refresh token...');
     console.log('All cookies received:', request.cookies); // Log all cookies
-  
+
     const refreshToken = request.cookies?.refreshToken;
     console.log('Refresh token from cookies:', refreshToken);
-  
+
     if (!refreshToken) {
       console.error('No refresh token found in cookies');
       throw new UnauthorizedException('Refresh token not found');
     }
-      console.log('rf')
+    console.log('rf');
     try {
       console.log('Verifying refresh token...');
       const decoded = this.jwtService.verify<TokenPayload>(refreshToken, {

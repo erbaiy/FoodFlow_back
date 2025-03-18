@@ -38,7 +38,7 @@ import { RestaurationModule } from '../resto/resto.module';
     EmailVerificationService,
     MailService,
   ],
-  exports: [AuthService, JwtAuthService, JwtAuthGuard, UserService],
+  exports: [AuthService, JwtAuthService, JwtAuthGuard, UserService,MongooseModule.forFeature([{ name: User.name, schema: UserSchema }])],
 })
 export class AuthModule {}
 

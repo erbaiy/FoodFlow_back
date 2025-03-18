@@ -1,19 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import {
   Controller,
   Post,
@@ -112,34 +96,6 @@ export class AuthController {
     return this.authService.refreshToken(refreshToken, response);
   }
 
-  // @Post('logout')
-  // @HttpCode(HttpStatus.OK)
-  // @UseGuards(JwtAuthGuard)
-  // @ApiBearerAuth()
-  // @ApiOperation({ summary: 'User logout' })
-  // async logout(@Res({ passthrough: true }) response: Response) {
-  //   // Clear both tokens
-  //   response.clearCookie('refreshToken', {
-  //     httpOnly: true,
-  //     secure: process.env.NODE_ENV === 'production',
-  //     sameSite: 'strict',
-  //     path: '/',
-  //   });
-
-  //   response.clearCookie('accessToken', {
-  //     httpOnly: true,
-  //     secure: process.env.NODE_ENV === 'production',
-  //     sameSite: 'strict',
-  //     path: '/',
-  //   });
-
-  //   return {
-  //     status: HttpStatus.OK,
-  //     data: {
-  //       message: 'Successfully logged out',
-  //     },
-  //   };
-  // }
 
   // Protected route example
   @Get('protected')
@@ -172,6 +128,42 @@ export class AuthController {
   ): Promise<AuthResponse> {
     return this.authService.registerClient(registerDto);
   }
+
+  
+  // @Post('register/restaurant')
+  // @UseInterceptors(
+  //   FileFieldsInterceptor([
+  //     { name: 'logo', maxCount: 1 },
+  //     { name: 'cover', maxCount: 1 },
+  //     { name: 'banner', maxCount: 1 },
+  //   ], restaurantMulterConfig),
+  // )
+  // async registerRestaurant(
+  //   @Body() registerDto: CreateRestaurantDto,
+  //   @UploadedFiles() files: {
+  //     logo?: Express.Multer.File[];
+  //     cover?: Express.Multer.File[];
+  //     banner?: Express.Multer.File[];
+  //   },
+  //   @Res() response: Response,
+  // ): Promise<void> {
+  //   try {
+  //     const validatedDto = plainToClass(CreateRestaurantDto, registerDto);
+  //     const errors = await validate(validatedDto);
+  
+  //     if (errors.length > 0) {
+  //       throw new HttpException('Validation failed', HttpStatus.BAD_REQUEST);
+  //     }
+  
+  //     const result = await this.authService.registerRestaurant(validatedDto, files);
+  //     response.status(result.status).json(result);
+  //   } catch (error) {
+  //     if (error instanceof HttpException) {
+  //       throw error;
+  //     }
+  //     throw new HttpException(error.message || 'Restaurant registration failed', HttpStatus.INTERNAL_SERVER_ERROR);
+  //   }
+  // }
 
   
   @Post('register/restaurant')
@@ -211,7 +203,6 @@ export class AuthController {
       throw new HttpException('Restaurant registration failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
-  
   
 
   @Get('verify-email')
@@ -265,6 +256,8 @@ async verifyEmail(
     @Query('token') token: string,
     @Body(new ValidationPipe()) { newPassword }: ResetPasswordDto,
   ): Promise<{ message: string; statusCode: number }> {
+    console.log('token',token)
+    console.log('newPassword',newPassword)
     return this.authService.resetPassword(token, newPassword);
   }
   @UseGuards(JwtAuthGuard)
@@ -318,6 +311,19 @@ async deleteUser(@Param('id') id: string) {
   
 
  }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

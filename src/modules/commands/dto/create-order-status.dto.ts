@@ -23,6 +23,5 @@ export class CreateOrderDto {
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
 
-  @IsEnum(OrderStatus)
-  status: OrderStatus;
+
 }

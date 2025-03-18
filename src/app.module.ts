@@ -9,6 +9,11 @@ import { MenuItemModule } from './modules/menu-item/menu-item.module';
 import { OrderModule } from './modules/commands/order.module';
 import { SocketModule } from './modules/socket/socket.module';
 import { RateLimiterModule } from 'nestjs-rate-limiter';
+import { SuperAdminModule } from './modules/super_admin/super-admin.module';
+import { ManagerModule } from './modules/resto-manager/restaurant-manager.module';
+import { DriverModule } from './modules/driver/driver.module';
+import { ClientModule } from './modules/client/client.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -35,6 +40,11 @@ import { RateLimiterModule } from 'nestjs-rate-limiter';
     MenuItemModule,
     OrderModule,
     SocketModule,
+    SuperAdminModule,
+    ManagerModule,
+    DriverModule,
+    ClientModule,
+    DashboardModule
 
   ],
 })

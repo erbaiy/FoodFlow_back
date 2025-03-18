@@ -3,11 +3,14 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/s
 import { OrderService } from './order.service';
 import { OrderStatus, UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { CreateOrderDto } from './dto/create-order-status.dto';
+import { ClientService } from '../client/client.service';
 
 @ApiTags('Orders')
 @Controller('orders')
 export class OrderController {
-  constructor(private readonly orderService: OrderService) {}
+  constructor(private readonly orderService: OrderService,
+
+  ) {}
 
   @Get('restaurant/:id')
   @ApiOperation({ summary: 'Get all orders for a restaurant' })

@@ -19,7 +19,9 @@ import { Injectable, Logger } from '@nestjs/common';
   transports: ['websocket', 'polling'],
 })
 @Injectable()
-export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class SocketGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(SocketGateway.name);
   private clientMap: Map<string, string> = new Map(); // Store socketId -> clientId mapping
 
@@ -42,25 +44,36 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   @SubscribeMessage('joinRoom')
   handleJoinRoom(
     @ConnectedSocket() client: Socket,
-    @MessageBody() roomId: string, // Expecting the client ID as the room ID
+    @MessageBody() roomId: string,
   ) {
+    
     client.join(roomId);
     this.logger.log(`Client ${client.id} joined room ${roomId}`);
-    this.clientMap.set(client.id, roomId); // Store the mapping socketId -> clientId
+    this.clientMap.set(client.id, roomId);
     client.emit('test', { message: 'Test message after joining room' });
     return { event: 'joinedRoom', data: roomId };
   }
 
-  // Notify a specific deliverer
-notifyDeliverer(delivererId: string, order: any) {
-  this.logger.log(`Notifying deliverer ${delivererId} about order ${order._id}`);
-  console.log(`Sending 'newOrder' to deliverer: ${delivererId}`); // Debugging log
+  
 
-  this.server.to(delivererId).emit('newOrder', {
+  // Notify a specific deliverer
+  notifyDeliverer(delivererId: string, order: any) {
+    this.logger.log(
+      `Notifying deliverer ${delivererId} about order ${order._id}`,
+    );
+    console.log(`Sending 'newCommand' to deliverer: ${delivererId}`); // Debugging log
+
+    this.server.to(delivererId).emit('newCommand', {
       orderId: order._id,
       status: order.status,
-  });
-}
+      client: order.client,
+      createdAt: order.createdAt,
+      deliveryAddress: order.deliveryAddress,
+      assignedTo: order.assignedTo,
+      delivererId: delivererId,
+      // Add any other relevant order details here
+    });
+  }
   // Notify a specific client
   notifyClient(clientId: string, order: any) {
     this.logger.log(`Notifying client ${clientId} about order ${order._id}`);
@@ -73,22 +86,76 @@ notifyDeliverer(delivererId: string, order: any) {
     this.logger.warn(`Client ${clientId} not found in clientMap.`);
   }
 
-  //  Notify Restaurants Manager 
+  //  Notify Restaurants Manager
   notifyRestaurantsManager(restoManager: string, order: any) {
-  this.logger.log(`Notifying restaurant manager ${restoManager} about order ${order._id}`);
-  this.server.to(restoManager).emit('orderUpdate', {
-    orderId: order._id,
-    status: order.status,
-  });
-  
-  // Notify when a new command is created
-  if (order.status === 'created' || order.status === 'new') {
-    this.server.to(restoManager).emit('newCommand', {
+    this.logger.log(
+      `Notifying restaurant manager ${restoManager} about order ${order._id}`,
+    );
+    this.server.to(restoManager).emit('orderUpdate', {
       orderId: order._id,
       status: order.status,
+    });
+
+    // Notify when a new command is created
+    if (order.status === 'created' || order.status === 'new') {
+      this.server.to(restoManager).emit('newCommand', {
+        orderId: order._id,
+        status: order.status,
+        createdAt: order.createdAt || new Date(),
+      });
+      this.logger.log(
+        `New command notification sent to restaurant manager ${restoManager}`,
+      );
+    }
+  }
+
+    //  Notify Restaurants Manager when a commande is delevred by the deliverer
+  // notifyRestaurantsManagerDelivered(restoManager: string, order: any) {
+  //   this.logger.log(
+  //     `Notifying restaurant manager ${restoManager} about order ${order._id}`,
+  //   );
+  //   this.server.to(restoManager).emit('orderDelivred', {
+  //     orderId: order._id,
+  //     status: order.status,
+  //   });
+
+  //   // Notify when a new command is created
+  //   if (order.status === 'delivered') {
+  //     this.server.to(restoManager).emit('orderDelivred', {
+  //       orderId: order._id,
+  //       status: order.status,
+  //       createdAt: order.createdAt || new Date(),
+  //     });
+  //     this.logger.log(
+  //       `New command notification sent to restaurant manager ${restoManager} command is ${order.status}`,
+  //     );
+  //   }
+  // }
+
+  notifyRestaurantsManagerDelivered(restoManager: string | any, order: any) {
+    if (!restoManager) {
+      this.logger.warn(`Cannot notify null restaurant manager about order ${order._id}`);
+      return;
+    }
+  
+    let managerId: string;
+    if (typeof restoManager === 'object' && restoManager !== null) {
+      managerId = restoManager.toString(); // Ensure this is correct
+    } else {
+      managerId = String(restoManager);
+    }
+  
+    this.logger.log(`Notifying restaurant manager ${managerId} about order ${order._id}`);
+  
+    this.server.to(managerId).emit('orderDelivred', {
+      orderId: order._id,
+      status: order.status,
+      restoManager: managerId, // Ensure this is included
       createdAt: order.createdAt || new Date(),
     });
-    this.logger.log(`New command notification sent to restaurant manager ${restoManager}`);
-  }}
+  
+    this.logger.log(`New command notification sent to restaurant manager ${managerId} command is ${order.status}`);
+  }
+
 
 }

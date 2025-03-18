@@ -17,11 +17,12 @@ import {
   InternalServerErrorException,
   Inject,
   forwardRef,
+  ConflictException,
 } from '@nestjs/common';
 import { UserService } from './userService.service';
 import { JwtService } from '@nestjs/jwt';
-import { Model } from 'mongoose';
-import { InjectModel } from '@nestjs/mongoose';
+import { ClientSession, Connection, Model } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from '../schema/user.schema';
 import { EmailVerificationService } from 'src/utils';
 import { MailService } from './mailService.service';
@@ -38,6 +39,8 @@ export class AuthService {
   private readonly jwtConfig: any;
 
   constructor(
+    @InjectConnection() private readonly connection: Connection, // Inject MongoDB connection
+
     private readonly userService: UserService,
     private readonly emailVerificationService: EmailVerificationService,
     private readonly mailService: MailService,
@@ -196,7 +199,86 @@ private setAuthCookies(
     }
   }
 
- 
+  // async registerRestaurant(
+  //   dto: CreateRestaurantDto,
+  //   files: {
+  //     logo?: Express.Multer.File[];
+  //     cover?: Express.Multer.File[];
+  //     banner?: Express.Multer.File[];
+  //   },
+  // ): Promise<AuthResponse> {
+  //   let user;
+  
+  //   try {
+  //     // Register the user first
+  //     const userData = {
+  //       email: dto.email,
+  //       password: dto.password,
+  //       fullName: dto.fullName,
+  //       phoneNumber: dto.phoneNumber,
+  //       address: dto.address,
+  //       role: dto.role,
+  //     };
+  
+  //     const registrationResult = await this.registerAndVerifyUser(userData);
+  
+  //     if (!registrationResult.data) {
+  //       throw new InternalServerErrorException('User registration failed');
+  //     }
+  
+  //     // Store the user ID for manual rollback
+  //     user = registrationResult.data.userId;
+  
+  //     // Create restaurant with the newly created user as manager
+  //     const restaurantData: CreateRestaurantDto = {
+  //       name: dto.name,
+  //       cuisineType: dto.cuisineType,
+  //       address: dto.address,
+  //       location: dto.location,
+  //       manager: registrationResult.data.userId,
+  //       isApproved: dto.isApproved || false,
+  //       menu: dto.menu || [],
+  //       email: dto.email,
+  //       password: dto.password,
+  //       fullName: dto.fullName,
+  //       phoneNumber: dto.phoneNumber,
+  //       role: dto.role,
+  //     };
+  
+  //     // Check if restaurant name already exists
+  //     const existingRestaurant = await this.restaurantService.findRestaurantByName(restaurantData.name);
+  //     if (existingRestaurant) {
+  //       throw new ConflictException('Restaurant name already exists');
+  //     }
+  
+  //     // Save restaurant
+  //     await this.restaurantService.createRestaurant(restaurantData, files);
+  
+  //     return {
+  //       status: HttpStatus.CREATED,
+  //       data: {
+  //         message: 'Restaurant registered successfully. Check your email for verification.',
+  //         accessToken: registrationResult.data.accessToken,
+  //         refreshToken: registrationResult.data.refreshToken,
+  //       },
+  //     };
+  //   } catch (error) {
+  //     this.logger.error(`Restaurant registration error: ${error.message}`, error.stack);
+  
+  //     // Manual rollback: Delete the user if restaurant registration fails
+  //     if (user) {
+  //       await this.userService.deleteUser(user);
+  //     }
+  
+  //     // Handle specific errors
+  //     if (error.code === 11000) { // MongoDB duplicate key error code
+  //       throw new ConflictException('Restaurant name already exists');
+  //     }
+  //     throw new InternalServerErrorException(error.message || 'Registration failed');
+  //   }
+  // }
+
+  
 async registerRestaurant(
   dto: CreateRestaurantDto,
   files: {
@@ -232,7 +314,7 @@ async registerRestaurant(
       isApproved: dto.isApproved || false,
       menu: dto.menu || [],
       email: dto.email,
-      password: dto.password,
+      password: dto.password, 
       fullName: dto.fullName,
       phoneNumber: dto.phoneNumber,
       role: dto.role,
@@ -324,39 +406,42 @@ async registerRestaurant(
     });
   }
 
-   async registerAndVerifyUser(
+  async registerAndVerifyUser(
     userData: RegisterDto,
   ): Promise<AuthResponse> {
     const registered = await this.userService.registerUser(userData);
-
+  
     if (!registered.success) {
       throw new HttpException(registered.error, HttpStatus.BAD_REQUEST);
     }
+  
     if (!registered.user?._id || !registered.user?.email) {
       throw new InternalServerErrorException(
         'Invalid user data after registration',
       );
     }
+  
     const emailSent = await this.sendVerificationEmail(
       registered.user._id.toString(),
       registered.user.email,
     );
 
+    
+  
     if (!emailSent) {
       throw new InternalServerErrorException(
         'Failed to send verification email',
       );
     }
-
+  
     return {
       status: HttpStatus.CREATED,
       data: {
-        userId: registered.user?.id,
+        userId: registered.user._id.toString(), // Return the user ID for rollback
         message: 'User created successfully. Check your email for verification',
       },
     };
   }
-
   async verifyEmail(
     token: string,
   ): Promise<{ message: string; statusCode: number }> {

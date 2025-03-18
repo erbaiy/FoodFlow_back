@@ -1,16 +1,20 @@
 import { Injectable, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, ObjectId } from 'mongoose';
 import { Order } from './schema/order.schema';
 import { OrderStatus, UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { CreateOrderDto } from './dto/create-order-status.dto';
 import { SocketGateway } from '../socket/socket.gateway';
+import { RestaurantService } from '../resto/resto.service';
+import { Restaurant } from '../resto/schema/resto.schema';
 
 @Injectable()
 export class OrderService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<Order>,
+    @InjectModel(Restaurant.name) private restaurentModel: Model<Restaurant>,
     private socketGateway: SocketGateway, // Inject SocketGateway
+    private restaurentService:RestaurantService,
   ) {}
 
   private async findOrderById(orderId: string) {
@@ -35,23 +39,56 @@ export class OrderService {
     return order.save();
   }
 
-  async getAllOrders(restaurantId: string) {
-    if (!Types.ObjectId.isValid(restaurantId)) {
-      throw new BadRequestException('Invalid restaurant ID');
-    }
-
-    const orders = await this.orderModel.find({ restaurant: restaurantId })
-      .populate('client')
-      .populate('items.menuItem')
-      .sort({ createdAt: -1 })
-      .exec();
-
-    if (!orders || orders.length === 0) {
-      throw new NotFoundException('No orders found');
-    }
-
-    return orders;
+  async getAllOrders(managerId: string) {
+  if (!Types.ObjectId.isValid(managerId)) {
+    throw new BadRequestException('Invalid restaurant ID');
   }
+  const resto = await this.restaurentModel.find({manager: managerId});
+  if (!resto || resto.length === 0) {
+    throw new NotFoundException('no resto for auth manager')
+  }
+  
+  const orders = await this.orderModel.find({ restaurant: resto[0]._id })
+    .populate('client')
+    .populate({
+      path: 'items.menuItem',
+      select: '_id name price'  // Explicitly selecting the fields we want
+    })
+    .sort({ createdAt: -1 })
+    .exec();
+
+  if (!orders || orders.length === 0) {
+    throw new NotFoundException('No orders found');
+  }
+
+  return orders;
+}
+// async getAllOrders(managerId: string) {
+//   if (!Types.ObjectId.isValid(managerId)) {
+//     throw new BadRequestException('Invalid restaurant ID');
+//   }
+  
+//   const resto = await this.restaurentModel.find({manager: managerId});
+//   if (!resto || resto.length === 0) {
+//     throw new NotFoundException('no resto for auth manager')
+//   }
+  
+//   const orders = await this.orderModel.find({ restaurant: resto[0]._id })
+//     .populate('client')
+//     .populate({
+//       path: 'items.menuItem',
+//       model: 'MenuItem',
+//       select: 'name _id'  // Explicitly selecting the fields we want
+//     })
+//     .sort({ createdAt: -1 })
+//     .exec();
+
+//   if (!orders || orders.length === 0) {
+//     throw new NotFoundException('No orders found');
+//   }
+
+//   return orders;
+// }
 
   async getOrderById(orderId: string) {
     return this.findOrderById(orderId);
@@ -128,11 +165,11 @@ export class OrderService {
       .populate('items.menuItem')
       .exec();
 
-    if (!orders || orders.length === 0) {
-      throw new NotFoundException('No orders available for delivery');
-    }
+    // if (!orders || orders.length === 0) {
+    //   throw new NotFoundException('No orders available for delivery');
+    // }
 
-    return orders;
+    return orders?orders:[];
   }
 
   async getDeliveryHistory(delivererId: string) {
@@ -148,7 +185,6 @@ export class OrderService {
     if (!orders || orders.length === 0) {
       throw new NotFoundException('No delivery history found');
     }
-
     return orders;
   }
 
@@ -169,17 +205,28 @@ export class OrderService {
 
   // Confirm delivery and notify the client
   async confirmDelivery(orderId: string) {
-    const order = await this.findOrderById(orderId);
-    if (order.status !== OrderStatus.READY) {
-      throw new BadRequestException('Order is not ready for delivery');
-    }
-    order.status = OrderStatus.DELIVERED;
-    await order.save();
-
-    // Notify the client
-    this.socketGateway.notifyClient(order.client.toString(), order);
-    return order;
+  const order = await this.findOrderById(orderId);
+  
+  if (order.status !== OrderStatus.READY) {
+    throw new BadRequestException('Order is not ready for delivery');
   }
+
+  const resto = await this.restaurentModel.findById(order.restaurant).populate('manager');
+  if(!resto){
+    throw new BadRequestException('resto not found');
+  } 
+  const manager = resto.manager;
+
+  order.status = OrderStatus.DELIVERED;
+  await order.save();
+
+  // Notify the restaurant manager about delivery
+  this.socketGateway.notifyRestaurantsManagerDelivered(manager.toString(), order);
+  
+  return order;
+}
+
+
 }
 
 

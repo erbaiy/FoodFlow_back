@@ -11,7 +11,7 @@ export class Order extends Document {
   client: MongooseSchema.Types.ObjectId;
 
   @Prop([{
-    menuItem: { type: MongooseSchema.Types.ObjectId, ref: 'MenuItem' },
+    menuItem: { type: MongooseSchema.Types.ObjectId, ref: 'MenuItem', required: true },
     quantity: { type: Number, required: true }
   }])
   items: Array<{ menuItem: MongooseSchema.Types.ObjectId; quantity: number }>;
@@ -26,6 +26,10 @@ export class Order extends Document {
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' }) // 'User' est l'entité du livreur
 assignedTo: string;
+
+@Prop({ type: Date, default: Date.now })
+createdAt: Date;
 }
 
+export type OrderDocument = Order & Document;
 export const OrderSchema = SchemaFactory.createForClass(Order);

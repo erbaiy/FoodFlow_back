@@ -42,6 +42,13 @@ export class User {
 
   @Prop({ default: false })
   isVerified: boolean;
+
+  @Prop({ default: 0 })
+  deliveries: number;
+  
+  @Prop({ default: 0, min: 0, max: 5 })
+  rating: number;
+  
 }
 
 export type UserDocument = User & Document & UserMethods;

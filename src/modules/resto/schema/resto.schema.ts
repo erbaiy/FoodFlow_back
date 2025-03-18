@@ -28,11 +28,20 @@ export class Restaurant {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: [true, 'Manager is required'], index: true })
   manager: MongooseSchema.Types.ObjectId;
 
+  
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: [false, 'driver is not required'], index: true })
+  driver: MongooseSchema.Types.ObjectId;
+
   @Prop({ default: false, required: true, index: true })
   isApproved: boolean;
 
   @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'MenuItem' }], default: [] })
   menu: MongooseSchema.Types.ObjectId[];
+
+
+
+  @Prop({ default: 0, min: 0, max: 5 })
+  rating: number;
 }
 
 export type RestaurantDocument = Restaurant & Document;

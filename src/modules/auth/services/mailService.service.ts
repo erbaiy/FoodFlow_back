@@ -1,15 +1,16 @@
-// mail.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
   private transporter: nodemailer.Transporter;
+  private readonly logger = new Logger(MailService.name);
 
   constructor(private configService: ConfigService) {
     const mailConfig = this.configService.get('mail');
-
+    
+    // Create the transporter with the proper configuration
     this.transporter = nodemailer.createTransport({
       host: mailConfig.smtp.host,
       port: mailConfig.smtp.port,
@@ -18,7 +19,23 @@ export class MailService {
         user: mailConfig.smtp.auth.user,
         pass: mailConfig.smtp.auth.pass,
       },
+      tls: {
+        // Do not fail on invalid certificates
+        rejectUnauthorized: false
+      }
     });
+    
+    // Verify the connection configuration
+    this.verifyConnection();
+  }
+
+  private async verifyConnection() {
+    try {
+      await this.transporter.verify();
+      this.logger.log('SMTP connection established successfully');
+    } catch (error) {
+      this.logger.error(`SMTP connection failed: ${error.message}`, error.stack);
+    }
   }
 
   async send(email: string, subject: string, html: string): Promise<boolean> {
@@ -29,13 +46,63 @@ export class MailService {
         subject,
         html,
       };
-
+      
       const info = await this.transporter.sendMail(mailOptions);
-      console.log('Email sent:', info.messageId);
+      this.logger.log(`Email sent: ${info.messageId}`);
       return true;
     } catch (error) {
-      console.error('Error sending email:', error);
+      this.logger.error(`Error sending email: ${error.message}`, error.stack);
       return false;
     }
   }
 }
+
+
+
+
+
+
+
+
+
+// // mail.service.ts
+// import { Injectable } from '@nestjs/common';
+// import { ConfigService } from '@nestjs/config';
+// import * as nodemailer from 'nodemailer';
+
+// @Injectable()
+// export class MailService {
+//   private transporter: nodemailer.Transporter;
+
+//   constructor(private configService: ConfigService) {
+//     const mailConfig = this.configService.get('mail');
+
+//     this.transporter = nodemailer.createTransport({
+//       host: mailConfig.smtp.host,
+//       port: mailConfig.smtp.port,
+//       secure: mailConfig.smtp.secure, // true for 465, false for other ports
+//       auth: {
+//         user: mailConfig.smtp.auth.user,
+//         pass: mailConfig.smtp.auth.pass,
+//       },
+//     });
+//   }
+
+//   async send(email: string, subject: string, html: string): Promise<boolean> {
+//     try {
+//       const mailOptions = {
+//         from: this.configService.get('mail.defaults.from'),
+//         to: email,
+//         subject,
+//         html,
+//       };
+
+//       const info = await this.transporter.sendMail(mailOptions);
+//       console.log('Email sent:', info.messageId);
+//       return true;
+//     } catch (error) {
+//       console.error('Error sending email:', error);
+//       return false;
+//     }
+//   }
+// }

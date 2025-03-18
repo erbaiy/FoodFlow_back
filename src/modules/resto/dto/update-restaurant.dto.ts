@@ -2,6 +2,7 @@
 import { IsString, IsBoolean, IsArray, IsOptional, IsUrl, IsMongoId } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ObjectId } from 'mongoose';
+import { CreateRestaurantDto } from './create-restaurant.dto';
 
 // update-restaurant.dto.ts
 export default class UpdateRestaurantDto {
