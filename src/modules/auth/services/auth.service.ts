@@ -139,6 +139,7 @@ private setAuthCookies(
             email: user.email,
             role: user.role,
           },
+          
           accessToken: tokens.accessToken,
         },
       };
