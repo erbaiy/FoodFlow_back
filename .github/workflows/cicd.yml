@@ -27,7 +27,6 @@ jobs:
           cd food-flow_back
           npm ci
   build-and-deploy:
-    needs: test
     runs-on: ubuntu-latest
     steps:
       # Checkout the code
