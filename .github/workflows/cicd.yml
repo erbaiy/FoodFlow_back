@@ -25,6 +25,6 @@ jobs:
       - name: Pull image from docker hub
         run: docker pull youness479/food-flow-back:latest 
       - name: Delete old container
-        run: docker rm -f nodejs-app-container  
+        run: docker rm -f food-flow-back-container || true  
       - name: Run Docker Container
         run: docker run -d -p 3005:3005 --name nodejs-app-container  youness479/food-flow-back
