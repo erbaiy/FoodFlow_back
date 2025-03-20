@@ -1,30 +1,74 @@
-name: Deploy FoodFlow Application
+name: CI/CD Pipeline
 
-on: 
+on:
   push:
     branches:
       - refactor-folder-structure-by-role
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Source
-        uses: actions/checkout@v4
-      - name: Login to docker hub
-        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}     
-      - name: Build Docker Image
-        run: docker build -t youness479/food-flow-back  .
-      - name: Publish Image to docker hub
-        run: docker push youness479/food-flow-back:latest 
- 
-  deploy:
-    needs: build
-    runs-on: self-hosted 
+      # Checkout the code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './food-flow_back/package-lock.json'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          cd food-flow_back
+          npm ci
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
     steps:
-      - name: Pull image from docker hub
-        run: docker pull youness479/food-flow-back:latest 
-      - name: Delete old container
-        run: docker rm -f food-flow-back-container || true  
-      - name: Run Docker Container
-        run: docker run -d -p 3005:3005 --name nodejs-app-container  youness479/food-flow-back
+      # Checkout the code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Build the Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t youness479/food-flow-back:latest ./food-flow_back
+
+      # Push the Docker image to Docker Hub
+      - name: Push Docker image
+        run: |
+          docker push youness479/food-flow-back:latest
+
+      # Deploy to EC2
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/app
+            docker stop scene_stream_backend || true
+            docker rm scene_stream_backend || true
+            docker pull youness479/food-flow-back:latest
+            docker run -d \
+              --name scene_stream_backend \
+              -p 5000:5000 \
+              --env-file ./food-flow_back/.env \
+              youness479/food-flow-back:latest
