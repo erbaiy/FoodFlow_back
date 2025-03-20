@@ -28,9 +28,11 @@ async function bootstrap() {
   // CORS configuration
   const allowedOrigins = [
     'http://localhost:3001',
-    'http://localhost:3000', 
+    'http://localhost:3000',
     'http://localhost:3005',
-    'http://localhost:5173'
+    'http://localhost:5173',
+    'http://54.242.110.209:3005',  // Add your EC2 public IP
+    'http://54.242.110.209'        // Also add without port
   ];
 
   app.enableCors({
@@ -52,8 +54,8 @@ async function bootstrap() {
   const port = 3005; // Changed port to 3005
   
   try {
-    await app.listen(port);
-    console.log(`Application is running on port ${port}`);
+    await app.listen(port, '0.0.0.0');
+        console.log(`Application is running on port ${port}`);
   } catch (error) {
     console.error(`Failed to start server: ${error.message}`);
     process.exit(1);
