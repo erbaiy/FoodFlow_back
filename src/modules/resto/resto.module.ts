@@ -15,7 +15,7 @@ import { AuthModule } from "../auth/auth.module";
             }
         ]),
         MenuItemModule,
-        forwardRef(() => AuthModule) // Use forwardRef here too
+        forwardRef(() => AuthModule) 
     ],
     controllers: [RestaurantController],
     providers: [RestaurantService],
