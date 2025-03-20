@@ -6,26 +6,7 @@ on:
       - refactor-folder-structure-by-role
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      # Checkout the code
-      - name: Checkout repository
-        uses: actions/checkout@v3
 
-      # Set up Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: './food-flow_back/package-lock.json'
-
-      # Install dependencies
-      - name: Install dependencies
-        run: |
-          cd food-flow_back
-          npm ci
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
