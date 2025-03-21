@@ -18,4 +18,7 @@ export default registerAs('jwt', () => ({
   passwordResetToken: {
     expiresIn: process.env.JWT_RESET_EXPIRATION || '1h',
   },
+  resetToken: {  // Changed from passwordResetToken to resetToken
+    expiresIn: process.env.JWT_RESET_EXPIRATION || '1h',
+  },
 }));

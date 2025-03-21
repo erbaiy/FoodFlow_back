@@ -111,7 +111,7 @@ export class AuthController {
       },
     };
   }
-  //
+  // register user
   @Post('register/user')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({
@@ -129,43 +129,7 @@ export class AuthController {
     return this.authService.registerClient(registerDto);
   }
 
-  
-  // @Post('register/restaurant')
-  // @UseInterceptors(
-  //   FileFieldsInterceptor([
-  //     { name: 'logo', maxCount: 1 },
-  //     { name: 'cover', maxCount: 1 },
-  //     { name: 'banner', maxCount: 1 },
-  //   ], restaurantMulterConfig),
-  // )
-  // async registerRestaurant(
-  //   @Body() registerDto: CreateRestaurantDto,
-  //   @UploadedFiles() files: {
-  //     logo?: Express.Multer.File[];
-  //     cover?: Express.Multer.File[];
-  //     banner?: Express.Multer.File[];
-  //   },
-  //   @Res() response: Response,
-  // ): Promise<void> {
-  //   try {
-  //     const validatedDto = plainToClass(CreateRestaurantDto, registerDto);
-  //     const errors = await validate(validatedDto);
-  
-  //     if (errors.length > 0) {
-  //       throw new HttpException('Validation failed', HttpStatus.BAD_REQUEST);
-  //     }
-  
-  //     const result = await this.authService.registerRestaurant(validatedDto, files);
-  //     response.status(result.status).json(result);
-  //   } catch (error) {
-  //     if (error instanceof HttpException) {
-  //       throw error;
-  //     }
-  //     throw new HttpException(error.message || 'Restaurant registration failed', HttpStatus.INTERNAL_SERVER_ERROR);
-  //   }
-  // }
-
-  
+  // register restaurant
   @Post('register/restaurant')
   @UseInterceptors(
     FileFieldsInterceptor([
@@ -204,17 +168,8 @@ export class AuthController {
     }
   }
   
-
-  @Get('verify-email')
-  @ApiOperation({ summary: 'Verify email address' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Email successfully verified',
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid or expired token',
-  })
+  // function to verify the email
+@Get('verify-email')
 async verifyEmail(
     @Query('token') token: string,
 ): Promise<{ message: string; statusCode: number }> {
@@ -222,52 +177,25 @@ async verifyEmail(
 }
 
 
+//  forget pass word 
   @Post('forgot-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Request password reset' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Password reset email sent',
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'User not found',
-  })
-  @ApiBody({ type: ForgotPasswordDto })
   async forgotPassword(
     @Body(new ValidationPipe()) { email }: ForgotPasswordDto,
   ): Promise<{ message: string; statusCode: number }> {
     return this.authService.forgetPassword(email);
   }
 
+  // reset password
   @Post('reset-password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reset password' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Password successfully reset',
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid or expired token',
-  })
-  @ApiBody({ type: ResetPasswordDto })
   async resetPassword(
     @Query('token') token: string,
     @Body(new ValidationPipe()) { newPassword }: ResetPasswordDto,
   ): Promise<{ message: string; statusCode: number }> {
-    console.log('token',token)
-    console.log('newPassword',newPassword)
+ 
     return this.authService.resetPassword(token, newPassword);
   }
-  @UseGuards(JwtAuthGuard)
-  @Get('gestionnaire')
-  @Roles('livreur') // Seul les gestionnaires peuvent accéder à cette route
-  getAdminDashboard() {
-    return 'gestionnaire dashboard';
-  }
-
-
+  
+// get user by auth user
 @Get('me')
 @UseGuards(JwtAuthGuard)
 async getMe(@Req() req: Request) {
@@ -277,7 +205,7 @@ async getMe(@Req() req: Request) {
 
 @Post('logout')
 @UseGuards(JwtAuthGuard)
-async logout(@Res() res: Response) {
+ async logout(@Res() res: Response) {
   res.clearCookie('accessToken');
   res.clearCookie('refreshToken');
   return res.send({ message: 'Logged out' });

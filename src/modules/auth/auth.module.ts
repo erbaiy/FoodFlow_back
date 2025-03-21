@@ -9,9 +9,9 @@ import { JwtAuthService } from './services/jwtService.service';
 import { UserService } from './services/userService.service';
 import { JwtAuthGuard } from '../../common/guards/JwtAuthGuard.guard';
 import { MailService } from './services/mailService.service';
-import { EmailVerificationService } from 'src/utils';
 import { Algorithm } from 'jsonwebtoken';
 import { RestaurationModule } from '../resto/resto.module';
+import { EmailVerificationService } from './services/email-verification.service';
 
 @Module({
   imports: [

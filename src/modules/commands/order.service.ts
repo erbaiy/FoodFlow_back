@@ -211,17 +211,17 @@ export class OrderService {
     throw new BadRequestException('Order is not ready for delivery');
   }
 
-  const resto = await this.restaurentModel.findById(order.restaurant).populate('manager');
+  const resto = await this.restaurentModel.findById(order.restaurant).populate<{ manager: { _id: Types.ObjectId } }>('manager');
   if(!resto){
     throw new BadRequestException('resto not found');
   } 
-  const manager = resto.manager;
+  const managerId = resto.manager._id;
 
   order.status = OrderStatus.DELIVERED;
   await order.save();
 
   // Notify the restaurant manager about delivery
-  this.socketGateway.notifyRestaurantsManagerDelivered(manager.toString(), order);
+  this.socketGateway.notifyRestaurantsManagerDelivered(managerId, order);
   
   return order;
 }

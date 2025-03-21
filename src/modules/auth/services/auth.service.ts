@@ -1,13 +1,3 @@
-
-
-
-
-
-
-
-
-
-
 import {
   Injectable,
   HttpException,
@@ -20,99 +10,36 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { UserService } from './userService.service';
-import { JwtService } from '@nestjs/jwt';
-import { ClientSession, Connection, Model } from 'mongoose';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model } from 'mongoose';
 import { User, UserDocument } from '../schema/user.schema';
-import { EmailVerificationService } from 'src/utils';
 import { MailService } from './mailService.service';
 import { LoginDto, RegisterDto } from '../dto/auth.dto';
-import { ConfigService } from '@nestjs/config';
-import { AuthResponse } from '../../../common/interfaces/authResponse';
 import { Response } from 'express';
 import { RestaurantService } from 'src/modules/resto/resto.service';
 import { CreateRestaurantDto } from '../dto/register.dto';
+import { JwtAuthService } from './jwtService.service';
+import { AuthResponse } from '../../../common/interfaces/authResponse';
+import { EmailVerificationService } from './email-verification.service';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly jwtConfig: any;
 
   constructor(
-    @InjectConnection() private readonly connection: Connection, // Inject MongoDB connection
-
+    @InjectConnection() private readonly connection: Connection,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly userService: UserService,
     private readonly emailVerificationService: EmailVerificationService,
     private readonly mailService: MailService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly jwtAuthService: JwtAuthService,
     @Inject(forwardRef(() => RestaurantService))
     private readonly restaurantService: RestaurantService,
-        @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-  ) {
-    this.jwtConfig = this.configService.get('jwt');
-  }
+  ) {}
 
-  private async generateTokens(payload: { sub: string; email: string; role: string }) {
-    const accessToken = await this.jwtService.signAsync(payload, {
-      secret: this.jwtConfig.secret,
-      algorithm: this.jwtConfig.accessToken.algorithm,
-      expiresIn: this.jwtConfig.accessToken.expiresIn,
-    });
-
-    const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: this.jwtConfig.secret,
-      algorithm: this.jwtConfig.refreshToken.algorithm,
-      expiresIn: this.jwtConfig.refreshToken.expiresIn,
-    });
-
-    return { accessToken, refreshToken };
-  }
-
-private setAuthCookies(
-  response: Response,
-  tokens: { accessToken: string; refreshToken: string },
-): void {
-  const secure = this.configService.get<string>('NODE_ENV') === 'production';
-  response.cookie('refreshToken', tokens.refreshToken, {
-    httpOnly: true,
-    secure,
-    sameSite: 'strict',
-    path: '/',
-    maxAge: this.parseDuration('1d'),
-  });
-
-  response.cookie('accessToken', tokens.accessToken, {
-    httpOnly: true,
-    secure,
-    sameSite: 'strict',
-    path: '/',
-    maxAge: this.parseDuration(this.jwtConfig.accessToken.expiresIn),
-  });
-  response.setHeader('Authorization', `Bearer ${tokens.accessToken}`);
-}
-
-  private parseDuration(duration: string): number {
-    const match = duration.match(/^(\d+)([smhd])$/);
-    if (!match) return 900000; // 15 minutes default
-
-    const [, value, unit] = match;
-    const num = parseInt(value, 10);
-
-    switch (unit) {
-      case 's':
-        return num * 1000;
-      case 'm':
-        return num * 60 * 1000;
-      case 'h':
-        return num * 60 * 60 * 1000;
-      case 'd':
-        return num * 24 * 60 * 60 * 1000;
-      default:
-        return 900000;
-    }
-  }
-
+  /**
+   * Handle user login
+   */
   async login(
     credentials: LoginDto,
     response: Response,
@@ -121,13 +48,16 @@ private setAuthCookies(
       const user = await this.validateUser(credentials);
       await this.checkEmailVerification(user);
 
-      const tokens = await this.generateTokens({
+      const payload = {
         sub: user._id.toString(),
         email: user.email,
-        role: user.role, // Assurez-vous que user.role est correctement récupéré
-      });
+        role: user.role,
+      };
 
-      this.setAuthCookies(response, tokens);
+      const accessToken = this.jwtAuthService.generateToken(payload, 'access');
+      const refreshToken = this.jwtAuthService.generateToken(payload, 'refresh');
+
+      this.setAuthCookies(response, { accessToken, refreshToken });
 
       return {
         status: HttpStatus.OK,
@@ -139,57 +69,63 @@ private setAuthCookies(
             email: user.email,
             role: user.role,
           },
-          
-          accessToken: tokens.accessToken,
+          accessToken,
         },
       };
     } catch (error) {
       this.logger.error(`Login failed for ${credentials.email}: ${error.message}`, error.stack);
-      throw this.handleLoginError(error);
+      throw this.handleAuthError(error);
     }
   }
 
+  /**
+   * Refresh access token using refresh token
+   */
   async refreshToken(
     refreshToken: string,
     response: Response,
   ): Promise<AuthResponse> {
     try {
-      const decoded = await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.jwtConfig.secret,
-        algorithms: [this.jwtConfig.refreshToken.algorithm],
-      });
-
+      // Verify the token and get the decoded payload
+      const decoded = await this.verifyToken(refreshToken);
+      
       const user = await this.userModel.findById(decoded.sub);
       if (!user) {
         throw new UnauthorizedException('User not found');
       }
 
-      const tokens = await this.generateTokens({
+      const payload = {
         sub: user._id.toString(),
         email: user.email,
-        role:user.role
-      });
+        role: user.role,
+      };
 
-      this.setAuthCookies(response, tokens);
+      const accessToken = this.jwtAuthService.generateToken(payload, 'access');
+      const newRefreshToken = this.jwtAuthService.generateToken(payload, 'refresh');
+
+      this.setAuthCookies(response, { 
+        accessToken, 
+        refreshToken: newRefreshToken 
+      });
 
       return {
         status: HttpStatus.OK,
         data: {
           message: 'Token refreshed successfully',
-          accessToken: tokens.accessToken,
+          accessToken,
         },
       };
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
-  
 
+  /**
+   * Register a new client user
+   */
   async registerClient(body: RegisterDto): Promise<AuthResponse> {
     try {
-      const registrationResult = await this.registerAndVerifyUser(
-        body
-      );
+      const registrationResult = await this.registerAndVerifyUser(body);
       return registrationResult;
     } catch (error) {
       this.logger.error(`Registration error: ${error.message}`, error.stack);
@@ -200,214 +136,231 @@ private setAuthCookies(
     }
   }
 
-  // async registerRestaurant(
-  //   dto: CreateRestaurantDto,
-  //   files: {
-  //     logo?: Express.Multer.File[];
-  //     cover?: Express.Multer.File[];
-  //     banner?: Express.Multer.File[];
-  //   },
-  // ): Promise<AuthResponse> {
-  //   let user;
-  
-  //   try {
-  //     // Register the user first
-  //     const userData = {
-  //       email: dto.email,
-  //       password: dto.password,
-  //       fullName: dto.fullName,
-  //       phoneNumber: dto.phoneNumber,
-  //       address: dto.address,
-  //       role: dto.role,
-  //     };
-  
-  //     const registrationResult = await this.registerAndVerifyUser(userData);
-  
-  //     if (!registrationResult.data) {
-  //       throw new InternalServerErrorException('User registration failed');
-  //     }
-  
-  //     // Store the user ID for manual rollback
-  //     user = registrationResult.data.userId;
-  
-  //     // Create restaurant with the newly created user as manager
-  //     const restaurantData: CreateRestaurantDto = {
-  //       name: dto.name,
-  //       cuisineType: dto.cuisineType,
-  //       address: dto.address,
-  //       location: dto.location,
-  //       manager: registrationResult.data.userId,
-  //       isApproved: dto.isApproved || false,
-  //       menu: dto.menu || [],
-  //       email: dto.email,
-  //       password: dto.password,
-  //       fullName: dto.fullName,
-  //       phoneNumber: dto.phoneNumber,
-  //       role: dto.role,
-  //     };
-  
-  //     // Check if restaurant name already exists
-  //     const existingRestaurant = await this.restaurantService.findRestaurantByName(restaurantData.name);
-  //     if (existingRestaurant) {
-  //       throw new ConflictException('Restaurant name already exists');
-  //     }
-  
-  //     // Save restaurant
-  //     await this.restaurantService.createRestaurant(restaurantData, files);
-  
-  //     return {
-  //       status: HttpStatus.CREATED,
-  //       data: {
-  //         message: 'Restaurant registered successfully. Check your email for verification.',
-  //         accessToken: registrationResult.data.accessToken,
-  //         refreshToken: registrationResult.data.refreshToken,
-  //       },
-  //     };
-  //   } catch (error) {
-  //     this.logger.error(`Restaurant registration error: ${error.message}`, error.stack);
-  
-  //     // Manual rollback: Delete the user if restaurant registration fails
-  //     if (user) {
-  //       await this.userService.deleteUser(user);
-  //     }
-  
-  //     // Handle specific errors
-  //     if (error.code === 11000) { // MongoDB duplicate key error code
-  //       throw new ConflictException('Restaurant name already exists');
-  //     }
-  //     throw new InternalServerErrorException(error.message || 'Registration failed');
-  //   }
-  // }
+  /**
+   * Register a new restaurant with its manager
+   */
+  async registerRestaurant(
+    dto: CreateRestaurantDto,
+    files: {
+      logo?: Express.Multer.File[];
+      cover?: Express.Multer.File[];
+      banner?: Express.Multer.File[];
+    },
+  ): Promise<AuthResponse> {
+    const session = await this.connection.startSession();
+    let userId: string | null = null;
 
-  
-async registerRestaurant(
-  dto: CreateRestaurantDto,
-  files: {
-    logo?: Express.Multer.File[];
-    cover?: Express.Multer.File[];
-    banner?: Express.Multer.File[];
-  },
-): Promise<AuthResponse> {
-  try {
-    // Register the user first
-    const userData = {
-      email: dto.email,
-      password: dto.password,
-      fullName: dto.fullName,
-      phoneNumber: dto.phoneNumber,
-      address: dto.address,
-      role: dto.role,
-    };
+    try {
+      session.startTransaction();
 
-    const registrationResult = await this.registerAndVerifyUser(userData);
+      // Extract user data from restaurant DTO
+      const userData = {
+        email: dto.email,
+        password: dto.password,
+        fullName: dto.fullName,
+        phoneNumber: dto.phoneNumber,
+        address: dto.address,
+        role: dto.role,
+      };
 
-    if (!registrationResult.data) {
-      throw new InternalServerErrorException('User registration failed');
+      // Register the user first
+      const registrationResult = await this.registerAndVerifyUser(userData);
+
+      if (!registrationResult.data || !registrationResult.data.userId) {
+        throw new InternalServerErrorException('User registration failed');
+      }
+
+      userId = registrationResult.data.userId;
+
+      // Check if restaurant name already exists
+      const existingRestaurant = await this.restaurantService.findRestaurantByName(dto.name);
+      if (existingRestaurant) {
+        throw new ConflictException('Restaurant name already exists');
+      }
+
+      // Create restaurant data
+      const restaurantData: CreateRestaurantDto = {
+        ...dto,
+        manager: userId,
+        isApproved: dto.isApproved || false,
+        menu: dto.menu || [],
+      };
+
+      // Create the restaurant
+      await this.restaurantService.createRestaurant(restaurantData, files);
+      
+      await session.commitTransaction();
+
+      return {
+        status: HttpStatus.CREATED,
+        data: {
+          message: 'Restaurant registered successfully. Check your email for verification.',
+          userId,
+        },
+      };
+    } catch (error) {
+      await session.abortTransaction();
+      
+      this.logger.error(`Restaurant registration error: ${error.message}`, error.stack);
+      
+      // Attempt to rollback user creation if restaurant creation fails
+      if (userId) {
+        try {
+          await this.userService.deleteUser(userId);
+        } catch (rollbackError) {
+          this.logger.error(`Rollback error: ${rollbackError.message}`, rollbackError.stack);
+        }
+      }
+      
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+      
+      throw new InternalServerErrorException(error.message || 'Registration failed');
+    } finally {
+      session.endSession();
+    }
+  }
+
+  /**
+   * Verify email with token
+   */
+  async verifyEmail(
+    token: string,
+  ): Promise<{ message: string; statusCode: number }> {
+    if (!token) {
+      throw new HttpException('No token provided', HttpStatus.BAD_REQUEST);
     }
 
-    // Create restaurant with the newly created user as manager
-    const restaurantData:CreateRestaurantDto = {
-      name: dto.name,
-      cuisineType: dto.cuisineType,
-      address: dto.address,
-      location: dto.location,
-      manager: registrationResult.data.userId,
-      isApproved: dto.isApproved || false,
-      menu: dto.menu || [],
-      email: dto.email,
-      password: dto.password, 
-      fullName: dto.fullName,
-      phoneNumber: dto.phoneNumber,
-      role: dto.role,
-    };
-
-    const logoPath = files.logo?.[0]?.path;
-    const bannerPath = files.banner?.[0]?.path;
-    console.log('files',files);
-
-
-
-    await this.restaurantService.createRestaurant(restaurantData, files);
-
-    return {
-      status: HttpStatus.CREATED,
-      data: {
-        message: 'Restaurant registered successfully. Check your email for verification.',
-        accessToken: registrationResult.data.accessToken,
-        refreshToken: registrationResult.data.refreshToken,
-      },
-    };
-  } catch (error) {
-    this.logger.error(`Restaurant registration error: ${error.message}`, error.stack);
-    throw new InternalServerErrorException('Registration failed');
+    try {
+      const decoded = await this.verifyToken(token);
+      const user = await this.userModel.findById(decoded.sub);
+      
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+      
+      return await this.completeEmailVerification(user);
+    } catch (error) {
+      throw this.handleVerificationError(error);
+    }
   }
+
+  /**
+   * Initiate password reset process
+   */
+  // services/auth.service.ts
+async forgetPassword(email: string): Promise<{ message: string; statusCode: number }> {
+  const user = await this.userService.findByEmail(email);
+  if (!user) {
+    throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+  }
+
+  const token = this.jwtAuthService.generateToken(
+    { id: user._id.toString(), email: user.email, role: user.role },
+    'reset', // Use the correct token type
+  );
+
+  const emailSent = await this.emailVerificationService.sendPasswordResetEmail(
+    user.email,
+    token,
+  );
+
+  if (!emailSent) {
+    throw new InternalServerErrorException('Failed to send password reset email');
+  }
+
+  return {
+    message: 'Password reset email sent successfully',
+    statusCode: HttpStatus.OK,
+  };
 }
 
+  /**
+   * Reset password with token
+   */
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string; statusCode: number }> {
+    if (!token) {
+      throw new HttpException('No token provided', HttpStatus.BAD_REQUEST);
+    }
 
-  private async generateAuthResponse(
-    user: UserDocument,
-    response: Response,
-  ): Promise<AuthResponse> {
-    const payload = {
-      id: user._id.toString(),
-      email: user.email,
-      role: user.role,
-    };
+    try {
+      const decoded = await this.verifyToken(token);
+      console.log('decoded',decoded);
+      const user = await this.userModel.findById(decoded.id);
+      
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+  
+      user.password = newPassword;
+      await user.save();
+      
+      return {
+        message: 'Password reset successfully',
+        statusCode: HttpStatus.OK,
+      };
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        throw new HttpException('Reset link has expired', HttpStatus.BAD_REQUEST);
+      }
 
-    const accessToken = await this.generateAccessToken(payload);
-    const refreshToken = await this.generateRefreshToken(payload);
-
-    // Set refresh token cookie
-    this.setRefreshTokenCookie(response, refreshToken);
-
-    return {
-      status: HttpStatus.OK,
-      data: {
-        message: 'Login successful',
-        accessToken,
-        refreshToken, // Optional: you might not want to send this in the response body
-      },
-    };
+      throw new InternalServerErrorException('Failed to reset password');
+    }
   }
 
-  private async generateAccessToken(payload: {
-    id: string;
-    email: string;
-    role: string;
-  }): Promise<string> {
-    return this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('jwt.secret'),
-      expiresIn: this.configService.get<string>('jwt.accessToken.expiresIn'),
-    });
+  /**
+   * Get user by ID
+   */
+  async getUserById(userId: string): Promise<UserDocument> {
+    try {
+      const user = await this.userModel.findById(userId).select('-password');
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+      return user;
+    } catch (error) {
+      this.logger.error(`Error fetching user by ID: ${error.message}`, error.stack);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to retrieve user information');
+    }
   }
 
-  private async generateRefreshToken(payload: {
-    id: string;
-    email: string;
-  }): Promise<string> {
-    return this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('jwt.secret'),
-      expiresIn: this.configService.get<string>('jwt.refreshToken.expiresIn'),
-    });
+  /**
+   * Logout user by clearing cookies
+   */
+  async logout(response: Response): Promise<void> {
+    try {
+      this.clearAuthCookies(response);
+    } catch (error) {
+      this.logger.error(`Logout error: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Failed to logout');
+    }
   }
 
-  private setRefreshTokenCookie(
-    response: Response,
-    refreshToken: string,
-  ): void {
-    const secure = this.configService.get<string>('NODE_ENV') === 'production';
-    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-
-    response.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure,
-      sameSite: 'strict',
-      path: '/',
-      maxAge,
-    });
+  /**
+   * Get restaurants with managers (admin function)
+   */
+  async getRestaurantsWithManagers() {
+    try {
+      return await this.restaurantService.getRestaurantsWithManagers();
+    } catch (error) {
+      this.logger.error(`Error fetching restaurants with managers: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Failed to fetch restaurants with managers');
+    }
   }
 
-  async registerAndVerifyUser(
+  // Helper methods
+  
+  /**
+   * Register a user and send verification email
+   */
+  private async registerAndVerifyUser(
     userData: RegisterDto,
   ): Promise<AuthResponse> {
     const registered = await this.userService.registerUser(userData);
@@ -422,12 +375,9 @@ async registerRestaurant(
       );
     }
   
-    const emailSent = await this.sendVerificationEmail(
-      registered.user._id.toString(),
-      registered.user.email,
-    );
-
+    const userId = registered.user._id.toString();
     
+    const emailSent = await this.sendVerificationEmail(userId, registered.user.email);
   
     if (!emailSent) {
       throw new InternalServerErrorException(
@@ -438,26 +388,15 @@ async registerRestaurant(
     return {
       status: HttpStatus.CREATED,
       data: {
-        userId: registered.user._id.toString(), // Return the user ID for rollback
+        userId,
         message: 'User created successfully. Check your email for verification',
       },
     };
   }
-  async verifyEmail(
-    token: string,
-  ): Promise<{ message: string; statusCode: number }> {
-    if (!token) {
-      throw new HttpException('No token provided', HttpStatus.BAD_REQUEST);
-    }
-
-    try {
-      const user = await this.validateAndGetUserFromToken(token);
-      return await this.completeEmailVerification(user);
-    } catch (error) {
-      throw this.handleVerificationError(error);
-    }
-  }
-
+  
+  /**
+   * Validate user login credentials
+   */
   private async validateUser(credentials: LoginDto): Promise<UserDocument> {
     const user = await this.userService.findByEmail(credentials.email);
     if (!user || !(await user.comparePassword(credentials.password))) {
@@ -466,6 +405,9 @@ async registerRestaurant(
     return user;
   }
 
+  /**
+   * Verify if user's email is verified or send a new verification email
+   */
   private async checkEmailVerification(user: UserDocument): Promise<void> {
     if (!user.isVerified) {
       const emailSent = await this.sendVerificationEmail(
@@ -485,30 +427,17 @@ async registerRestaurant(
     }
   }
 
-  private async validateAndGetUserFromToken(
-    token: string,
-  ): Promise<UserDocument> {
-    try {
-      const decoded = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get<string>('jwt.secret'),
-      });
-
-      const user = await this.userModel.findById(decoded.id);
-      if (!user) {
-        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-      }
-
-      return user;
-    } catch (error) {
-      throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
-    }
-  }
-
+  /**
+   * Complete email verification process
+   */
   private async completeEmailVerification(
     user: UserDocument,
   ): Promise<{ message: string; statusCode: number }> {
     if (user.isVerified) {
-      throw new HttpException('Email already verified', HttpStatus.BAD_REQUEST);
+      return {
+        message: 'Email already verified',
+        statusCode: HttpStatus.OK,
+      };
     }
 
     user.isVerified = true;
@@ -520,6 +449,9 @@ async registerRestaurant(
     };
   }
 
+  /**
+   * Send verification email
+   */
   private async sendVerificationEmail(
     userId: string,
     email: string,
@@ -527,101 +459,41 @@ async registerRestaurant(
     return this.emailVerificationService.sendEmailVerification(userId, email);
   }
 
-  private handleLoginError(error: Error): never {
-    this.logger.error(`Login error: ${error.message}`, error.stack);
-    if (error instanceof HttpException) {
-      throw error;
-    }
-    throw new InternalServerErrorException('An unexpected error occurred');
-  }
-
-  private handleVerificationError(error: Error): never {
-    this.logger.error(`Verification error: ${error.message}`, error.stack);
-    if (error.name === 'TokenExpiredError') {
-      throw new HttpException(
-        'Verification link has expired',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-    throw new HttpException(
-      'Invalid verification link',
-      HttpStatus.BAD_REQUEST,
-    );
-  }
-
-  async forgetPassword(
-    email: string,
-  ): Promise<{ message: string; statusCode: number }> {
-    const user = await this.userModel.findOne({ email });
-    if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-    }
-
-    const token = await this.generateAccessToken({
-      id: user._id.toString(),
-      email: user.email,
-      role: user.role,
+  /**
+   * Set authentication cookies
+   */
+  private setAuthCookies(
+    response: Response,
+    tokens: { accessToken: string; refreshToken: string },
+  ): void {
+    const secure = process.env.NODE_ENV === 'production';
+    
+    // Set refresh token
+    response.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: this.parseDuration('1d'), // 1 day
     });
 
-    const emailSent =
-      await this.emailVerificationService.sendPasswordResetEmail(
-        user.email,
-        token,
-      );
-
-    if (!emailSent) {
-      throw new InternalServerErrorException(
-        'Failed to send password reset email',
-      );
-    }
-
-    return {
-      message: 'Password reset email sent successfully',
-      statusCode: HttpStatus.OK,
-    };
+    // Set access token
+    response.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true,
+      secure,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: this.parseDuration('1h'), // 1 hour or based on JWT config
+    });
+    
+    // Set Authorization header
+    response.setHeader('Authorization', `Bearer ${tokens.accessToken}`);
   }
-
-  async resetPassword(
-    token: string,
-    newPassword: string,
-  ): Promise<{ message: string; statusCode: number }> {
-    if (!token) {
-      throw new HttpException('No token provided', HttpStatus.BAD_REQUEST);
-    }
-
-    const user = await this.validateAndGetUserFromToken(token);
-
-    try {
-      user.password = newPassword;
-      await user.save();
-      return {
-        message: 'Password reset successfully',
-        statusCode: HttpStatus.OK,
-      };
-    } catch (error) {
-      throw new InternalServerErrorException('Failed to reset password');
-    }
-  }
-
-
-  async getUserById(userId: string): Promise<UserDocument> {
-  try {
-    const user = await this.userModel.findById(userId).select('-password');
-    if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-    }
-    return user;
-  } catch (error) {
-    this.logger.error(`Error fetching user by ID: ${error.message}`, error.stack);
-    if (error instanceof HttpException) {
-      throw error;
-    }
-    throw new InternalServerErrorException('Failed to retrieve user information');
-  }
-}
-
-async logout(response: Response): Promise<void> {
-  try {
+  
+  /**
+   * Clear authentication cookies
+   */
+  private clearAuthCookies(response: Response): void {
     response.clearCookie('accessToken', {
       httpOnly: true,
       path: '/',
@@ -635,26 +507,67 @@ async logout(response: Response): Promise<void> {
     });
     
     response.removeHeader('Authorization');
-  } catch (error) {
-    this.logger.error(`Logout error: ${error.message}`, error.stack);
-    throw new InternalServerErrorException('Failed to logout');
-  }
-} 
-
-
-
-async getRestaurantsWithManagers(){
-  try {
-    const restaurants = await this.restaurantService.getRestaurantsWithManagers();
-    return restaurants;
-  } catch (error) {
-    this.logger.error(`Error fetching restaurants with managers: ${error.message}`, error.stack);
-    throw new InternalServerErrorException('Failed to fetch restaurants with managers');
   }
 
+  /**
+   * Parse duration string to milliseconds
+   */
+  private parseDuration(duration: string): number {
+    const match = duration.match(/^(\d+)([smhd])$/);
+    if (!match) return 900000; // 15 minutes default
 
-}
+    const [, value, unit] = match;
+    const num = parseInt(value, 10);
 
+    switch (unit) {
+      case 's': return num * 1000;
+      case 'm': return num * 60 * 1000;
+      case 'h': return num * 60 * 60 * 1000;
+      case 'd': return num * 24 * 60 * 60 * 1000;
+      default: return 900000;
+    }
+  }
+  
+  /**
+   * Verify JWT token
+   */
+  private async verifyToken(token: string): Promise<any> {
+    try {
+      // Note: Implement this in JwtAuthService
+      return await this.jwtAuthService.verifyToken(token);
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        throw new HttpException('Token has expired', HttpStatus.UNAUTHORIZED);
+      }
+      throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
+    }
+  }
 
+  /**
+   * Handle authentication errors
+   */
+  private handleAuthError(error: Error): never {
+    this.logger.error(`Auth error: ${error.message}`, error.stack);
+    if (error instanceof HttpException) {
+      throw error;
+    }
+    throw new InternalServerErrorException('An unexpected error occurred');
+  }
 
+  /**
+   * Handle verification errors
+   */
+  private handleVerificationError(error: Error): never {
+    this.logger.error(`Verification error: ${error.message}`, error.stack);
+    if (error.name === 'TokenExpiredError') {
+      throw new HttpException(
+        'Verification link has expired',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    throw new HttpException(
+      'Invalid verification link',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
 }

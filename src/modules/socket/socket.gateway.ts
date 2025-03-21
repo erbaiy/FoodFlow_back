@@ -109,53 +109,48 @@ export class SocketGateway
     }
   }
 
-    //  Notify Restaurants Manager when a commande is delevred by the deliverer
-  // notifyRestaurantsManagerDelivered(restoManager: string, order: any) {
-  //   this.logger.log(
-  //     `Notifying restaurant manager ${restoManager} about order ${order._id}`,
-  //   );
-  //   this.server.to(restoManager).emit('orderDelivred', {
+  // notifyRestaurantsManagerDelivered(restoManager: string | any, order: any) {
+  //   if (!restoManager) {
+  //     this.logger.warn(`Cannot notify null restaurant manager about order ${order._id}`);
+  //     return;
+  //   }
+  
+  //   let managerId: string;
+  //   if (typeof restoManager === 'object' && restoManager !== null) {
+  //     managerId = restoManager.toString(); // Ensure this is correct
+  //   } else {
+  //     managerId = String(restoManager);
+  //   }
+  
+  //   this.logger.log(`Notifying restaurant manager ${managerId} about order ${order._id}`);
+  
+  //   this.server.to(managerId).emit('orderDelivred', {
   //     orderId: order._id,
   //     status: order.status,
+  //     restoManager: managerId, // Ensure this is included
+  //     createdAt: order.createdAt || new Date(),
   //   });
-
-  //   // Notify when a new command is created
-  //   if (order.status === 'delivered') {
-  //     this.server.to(restoManager).emit('orderDelivred', {
-  //       orderId: order._id,
-  //       status: order.status,
-  //       createdAt: order.createdAt || new Date(),
-  //     });
-  //     this.logger.log(
-  //       `New command notification sent to restaurant manager ${restoManager} command is ${order.status}`,
-  //     );
-  //   }
+  
+  //   this.logger.log(`New command notification sent to restaurant manager ${managerId} command is ${order.status}`);
   // }
 
-  notifyRestaurantsManagerDelivered(restoManager: string | any, order: any) {
-    if (!restoManager) {
-      this.logger.warn(`Cannot notify null restaurant manager about order ${order._id}`);
-      return;
-    }
-  
-    let managerId: string;
-    if (typeof restoManager === 'object' && restoManager !== null) {
-      managerId = restoManager.toString(); // Ensure this is correct
-    } else {
-      managerId = String(restoManager);
-    }
-  
-    this.logger.log(`Notifying restaurant manager ${managerId} about order ${order._id}`);
-  
-    this.server.to(managerId).emit('orderDelivred', {
+
+
+  notifyRestaurantsManagerDelivered(restoManagerId, order: any) {
+    this.logger.log(
+      `Notifying resto Manager ${restoManagerId} that the order whit id:  ${order._id}  is delevred `,
+    );
+    console.log(`Sending 'command is delevred  ' to rest manager: ${restoManagerId}`); // Debugging log
+
+    this.server.to(restoManagerId).emit('change', {
       orderId: order._id,
       status: order.status,
-      restoManager: managerId, // Ensure this is included
-      createdAt: order.createdAt || new Date(),
+      client: order.client,
+      createdAt: order.createdAt,
+      deliveryAddress: order.deliveryAddress,
+      assignedTo: order.assignedTo,
+      restoManagerId: restoManagerId,
     });
-  
-    this.logger.log(`New command notification sent to restaurant manager ${managerId} command is ${order.status}`);
   }
-
 
 }
