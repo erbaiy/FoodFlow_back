@@ -58,8 +58,8 @@ export class CreateRestaurantDto {
 
   @IsOptional()
   @IsMongoId()
-  
-  manager: string;
+
+  manager?: string;
 
   @ApiProperty({ example: ['507f1f77bcf86cd799439011'], description: 'Menu items IDs' })
   @IsArray()

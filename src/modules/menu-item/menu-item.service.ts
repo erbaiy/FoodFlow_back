@@ -184,7 +184,24 @@ export class MenuItemService {
    * @param item - The Mongoose document or plain object.
    * @returns The mapped IMenuItem object.
    */
+  // private mapToInterface(item: any): IMenuItem {
+  //   return {
+  //     _id: item._id.toString(), // Convert ObjectId to string
+  //     name: item.name,
+  //     description: item.description,
+  //     price: item.price,
+  //     image: item.image,
+  //     category: item.category,
+  //     isAvailable: item.isAvailable,
+  //     createdAt: item.createdAt,
+  //     updatedAt: item.updatedAt,
+  //   };
+  // }
   private mapToInterface(item: any): IMenuItem {
+    console.log('Item received in mapToInterface:', item);
+    if (!item || !item._id) {
+      throw new Error('Invalid item provided');
+    }
     return {
       _id: item._id.toString(), // Convert ObjectId to string
       name: item.name,

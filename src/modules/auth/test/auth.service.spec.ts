@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from './auth.service';
-import { UserService } from './userService.service';
-import { MailService } from './mailService.service';
+import { AuthService } from '../services/auth.service';
+import { UserService } from '../services/userService.service';
+import { MailService } from '../services/mailService.service';
 import { RestaurantService } from 'src/modules/resto/resto.service';
-import { JwtAuthService } from './jwtService.service';
-import { EmailVerificationService } from './email-verification.service';
+import { JwtAuthService } from '../services/jwtService.service';
+import { EmailVerificationService } from '../services/email-verification.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { User, UserDocument } from '../schema/user.schema';
@@ -311,103 +311,99 @@ describe('AuthService', () => {
     });
   });
 
-  // describe('registerRestaurant', () => {
-  //   const restaurantDto: CreateRestaurantDto = {
-  //     name: 'Test Restaurant',
-  //     email: 'restaurant@example.com',
-  //     password: 'Password123',
-  //     fullName: 'Restaurant Manager',
-  //     phoneNumber: '+1234567890',
-  //     address: '123 Test St',
-  //     location: '40.7128° N, 74.0060° W',
-  //     role: 'restaurant',
-  //   };
-  //   const mockFiles = {
-  //     logo: [{ filename: 'logo.jpg' }] as Express.Multer.File[],
-  //   };
-
-  //   it('should successfully register a restaurant with manager', async () => {
-  //     // Arrange
-  //     const mockUserId = 'manager_user_id';
-  //     const mockSession = connection.startSession();
-
-  //     // Mock successful user registration
-  //     jest.spyOn(authService as any, 'registerAndVerifyUser').mockResolvedValue({
-  //       status: HttpStatus.CREATED,
-  //       data: {
-  //         userId: mockUserId,
-  //         message: 'User created successfully',
-  //       },
-  //     });
-
-  //     // Mock restaurant checks
-  //     jest.spyOn(restaurantService, 'findRestaurantByName').mockResolvedValue(null);
-  //     jest.spyOn(restaurantService, 'createRestaurant').mockResolvedValue({} as any);
-
-  //     // Act
-  //     const result = await authService.registerRestaurant(restaurantDto, mockFiles);
-
-  //     // Assert
-  //     expect(connection.startSession).toHaveBeenCalled();
-  //     expect(mockSession.startTransaction).toHaveBeenCalled();
-  //     expect(authService['registerAndVerifyUser']).toHaveBeenCalled();
-  //     expect(restaurantService.findRestaurantByName).toHaveBeenCalledWith(restaurantDto.name);
-  //     expect(restaurantService.createRestaurant).toHaveBeenCalled();
-  //     expect(mockSession.commitTransaction).toHaveBeenCalled();
-  //     expect(mockSession.endSession).toHaveBeenCalled();
-  //     expect(result.status).toBe(HttpStatus.CREATED);
-  //     expect(result.data.userId).toBe(mockUserId);
-  //   });
-
-  //   it('should throw ConflictException if restaurant name already exists', async () => {
-  //     // Arrange
-  //     const mockUserId = 'manager_user_id';
-  //     const mockSession = connection.startSession();
-
-  //     // Mock successful user registration
-  //     jest.spyOn(authService as any, 'registerAndVerifyUser').mockResolvedValue({
-  //       status: HttpStatus.CREATED,
-  //       data: {
-  //         userId: mockUserId,
-  //         message: 'User created successfully',
-  //       },
-  //     });
-
-  //     // Mock restaurant name check - exists
-  //     jest.spyOn(restaurantService, 'findRestaurantByName').mockResolvedValue({} as any);
-  //     jest.spyOn(userService, 'deleteUser').mockResolvedValue(true);
-
-  //     // Act & Assert
-  //     await expect(authService.registerRestaurant(restaurantDto, mockFiles)).rejects.toThrow(ConflictException);
-  //     expect(mockSession.abortTransaction).toHaveBeenCalled();
-  //     expect(userService.deleteUser).toHaveBeenCalledWith(mockUserId);
-  //   });
-
-  //   it('should rollback and delete user if restaurant creation fails', async () => {
-  //     // Arrange
-  //     const mockUserId = 'manager_user_id';
-  //     const mockSession = connection.startSession();
-
-  //     // Mock successful user registration
-  //     jest.spyOn(authService as any, 'registerAndVerifyUser').mockResolvedValue({
-  //       status: HttpStatus.CREATED,
-  //       data: {
-  //         userId: mockUserId,
-  //         message: 'User created successfully',
-  //       },
-  //     });
-
-  //     // Mock restaurant checks
-  //     jest.spyOn(restaurantService, 'findRestaurantByName').mockResolvedValue(null);
-  //     jest.spyOn(restaurantService, 'createRestaurant').mockRejectedValue(new Error('Restaurant creation failed'));
-  //     jest.spyOn(userService, 'deleteUser').mockResolvedValue(true);
-
-  //     // Act & Assert
-  //     await expect(authService.registerRestaurant(restaurantDto, mockFiles)).rejects.toThrow(InternalServerErrorException);
-  //     expect(mockSession.abortTransaction).toHaveBeenCalled();
-  //     expect(userService.deleteUser).toHaveBeenCalledWith(mockUserId);
-  //   });
-  // });
+  describe('registerRestaurant', () => {
+    const restaurantDto: CreateRestaurantDto = {
+      name: 'Test Restaurant',
+      email: 'restaurant@example.com',
+      password: 'Password123',
+      fullName: 'Restaurant Manager',
+      phoneNumber: '+1234567890',
+      address: '123 Test St',
+      location: '40.7128° N, 74.0060° W',
+      role: 'restaurant',
+      manager: 'manager_user_id', // ✅ Fixed missing manager
+    };
+    const mockFiles = {
+      logo: [{ filename: 'logo.jpg' }] as Express.Multer.File[],
+    };
+  
+    it('should successfully register a restaurant with manager', async () => {
+      // Arrange
+      const mockUserId = 'manager_user_id';
+      const mockSession = await connection.startSession(); // ✅ Await the session
+  
+      jest.spyOn(authService as any, 'registerAndVerifyUser').mockResolvedValue({
+        status: HttpStatus.CREATED,
+        data: {
+          userId: mockUserId,
+          message: 'User created successfully',
+        },
+      });
+  
+      jest.spyOn(restaurantService, 'findRestaurantByName').mockResolvedValue(null);
+      jest.spyOn(restaurantService, 'createRestaurant').mockResolvedValue({} as any);
+  
+      // Act
+      const result = await authService.registerRestaurant(restaurantDto, mockFiles);
+  
+      // Assert
+      expect(connection.startSession).toHaveBeenCalled();
+      expect(mockSession.startTransaction).toHaveBeenCalled();
+      expect(authService['registerAndVerifyUser']).toHaveBeenCalled();
+      expect(restaurantService.findRestaurantByName).toHaveBeenCalledWith(restaurantDto.name);
+      expect(restaurantService.createRestaurant).toHaveBeenCalled();
+      expect(mockSession.commitTransaction).toHaveBeenCalled();
+      expect(mockSession.endSession).toHaveBeenCalled();
+      expect(result.status).toBe(HttpStatus.CREATED);
+      expect(result.data.userId).toBe(mockUserId);
+    });
+  
+    it('should throw ConflictException if restaurant name already exists', async () => {
+      // Arrange
+      const mockUserId = 'manager_user_id';
+      const mockSession = await connection.startSession(); // ✅ Await the session
+  
+      jest.spyOn(authService as any, 'registerAndVerifyUser').mockResolvedValue({
+        status: HttpStatus.CREATED,
+        data: {
+          userId: mockUserId,
+          message: 'User created successfully',
+        },
+      });
+  
+      jest.spyOn(restaurantService, 'findRestaurantByName').mockResolvedValue({} as any);
+      jest.spyOn(userService, 'deleteUser').mockResolvedValue({ success: true }); // ✅ Fixed return type
+  
+      // Act & Assert
+      await expect(authService.registerRestaurant(restaurantDto, mockFiles)).rejects.toThrow(ConflictException);
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(userService.deleteUser).toHaveBeenCalledWith(mockUserId);
+    });
+  
+    it('should rollback and delete user if restaurant creation fails', async () => {
+      // Arrange
+      const mockUserId = 'manager_user_id';
+      const mockSession = await connection.startSession(); // ✅ Await the session
+  
+      jest.spyOn(authService as any, 'registerAndVerifyUser').mockResolvedValue({
+        status: HttpStatus.CREATED,
+        data: {
+          userId: mockUserId,
+          message: 'User created successfully',
+        },
+      });
+  
+      jest.spyOn(restaurantService, 'findRestaurantByName').mockResolvedValue(null);
+      jest.spyOn(restaurantService, 'createRestaurant').mockRejectedValue(new Error('Restaurant creation failed'));
+      jest.spyOn(userService, 'deleteUser').mockResolvedValue({ success: true }); // ✅ Fixed return type
+  
+      // Act & Assert
+      await expect(authService.registerRestaurant(restaurantDto, mockFiles)).rejects.toThrow(InternalServerErrorException);
+      expect(mockSession.abortTransaction).toHaveBeenCalled();
+      expect(userService.deleteUser).toHaveBeenCalledWith(mockUserId);
+    });
+  });
+  
 
   describe('verifyEmail', () => {
     const mockToken = 'valid_verification_token';
