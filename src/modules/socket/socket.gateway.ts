@@ -53,9 +53,6 @@ export class SocketGateway
     client.emit('test', { message: 'Test message after joining room' });
     return { event: 'joinedRoom', data: roomId };
   }
-
-  
-
   // Notify a specific deliverer
   notifyDeliverer(delivererId: string, order: any) {
     this.logger.log(
@@ -85,7 +82,6 @@ export class SocketGateway
     }
     this.logger.warn(`Client ${clientId} not found in clientMap.`);
   }
-
   //  Notify Restaurants Manager
   notifyRestaurantsManager(restoManager: string, order: any) {
     this.logger.log(
@@ -108,34 +104,7 @@ export class SocketGateway
       );
     }
   }
-
-  // notifyRestaurantsManagerDelivered(restoManager: string | any, order: any) {
-  //   if (!restoManager) {
-  //     this.logger.warn(`Cannot notify null restaurant manager about order ${order._id}`);
-  //     return;
-  //   }
-  
-  //   let managerId: string;
-  //   if (typeof restoManager === 'object' && restoManager !== null) {
-  //     managerId = restoManager.toString(); // Ensure this is correct
-  //   } else {
-  //     managerId = String(restoManager);
-  //   }
-  
-  //   this.logger.log(`Notifying restaurant manager ${managerId} about order ${order._id}`);
-  
-  //   this.server.to(managerId).emit('orderDelivred', {
-  //     orderId: order._id,
-  //     status: order.status,
-  //     restoManager: managerId, // Ensure this is included
-  //     createdAt: order.createdAt || new Date(),
-  //   });
-  
-  //   this.logger.log(`New command notification sent to restaurant manager ${managerId} command is ${order.status}`);
-  // }
-
-
-
+  // notify Restaurants Manager that the order is delivered&
   notifyRestaurantsManagerDelivered(restoManagerId, order: any) {
     this.logger.log(
       `Notifying resto Manager ${restoManagerId} that the order whit id:  ${order._id}  is delevred `,

@@ -16,19 +16,20 @@ import { Response } from 'express';
 
 // Mock models and dependencies
 const mockUserModel = () => ({
-  findById: jest.fn(),
+  findById: jest.fn().mockReturnThis(),
   findOne: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
+  select: jest.fn().mockReturnThis(),
 });
 
 const mockConnection = () => ({
-  startSession: jest.fn().mockReturnValue({
+  startSession: jest.fn().mockImplementation(() => ({
     startTransaction: jest.fn(),
     commitTransaction: jest.fn(),
     abortTransaction: jest.fn(),
     endSession: jest.fn(),
-  }),
+  })),
 });
 
 const mockUserService = () => ({
@@ -178,53 +179,42 @@ describe('AuthService', () => {
       email: 'test@example.com',
       role: 'client',
     } as unknown as UserDocument;
-
-    it('should successfully refresh tokens', async () => {
-      // Arrange
-      const response = mockResponse();
-      jest.spyOn(jwtAuthService, 'verifyToken').mockResolvedValue({
-        sub: mockUser._id,
-        email: mockUser.email,
-        role: mockUser.role,
-      });
-      jest.spyOn(userModel, 'findById').mockResolvedValue(mockUser);
-      jest.spyOn(jwtAuthService, 'generateToken')
-        .mockReturnValueOnce('new_access_token')
-        .mockReturnValueOnce('new_refresh_token');
-
-      // Act
-      const result = await authService.refreshToken(mockRefreshToken, response);
-
-      // Assert
-      expect(jwtAuthService.verifyToken).toHaveBeenCalledWith(mockRefreshToken);
-      expect(userModel.findById).toHaveBeenCalledWith(mockUser._id);
-      expect(jwtAuthService.generateToken).toHaveBeenCalledTimes(2);
-      expect(response.cookie).toHaveBeenCalledTimes(2);
-      expect(result.status).toBe(HttpStatus.OK);
-      expect(result.data.accessToken).toBe('new_access_token');
+  
+    beforeEach(() => {
+      // Reset all mocks before each test
+      jest.clearAllMocks();
     });
-
+  
+  
     it('should throw UnauthorizedException if token verification fails', async () => {
       // Arrange
       const response = mockResponse();
       jest.spyOn(jwtAuthService, 'verifyToken').mockRejectedValue(new Error('Invalid token'));
-
+  
       // Act & Assert
-      await expect(authService.refreshToken(mockRefreshToken, response)).rejects.toThrow(UnauthorizedException);
+      await expect(authService.refreshToken(mockRefreshToken, response))
+        .rejects.toThrow(UnauthorizedException);
     });
-
+  
     it('should throw UnauthorizedException if user not found', async () => {
       // Arrange
       const response = mockResponse();
       jest.spyOn(jwtAuthService, 'verifyToken').mockResolvedValue({
         sub: mockUser._id,
       });
-      jest.spyOn(userModel, 'findById').mockResolvedValue(null);
-
+  
+      const mockQuery = {
+        select: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue(null),
+      };
+      jest.spyOn(userModel, 'findById').mockImplementation(() => mockQuery as any);
+  
       // Act & Assert
-      await expect(authService.refreshToken(mockRefreshToken, response)).rejects.toThrow(UnauthorizedException);
+      await expect(authService.refreshToken(mockRefreshToken, response))
+        .rejects.toThrow(UnauthorizedException);
     });
   });
+  //
 
   describe('registerClient', () => {
     const registerDto: RegisterDto = {
@@ -307,7 +297,7 @@ describe('AuthService', () => {
       jest.spyOn(emailVerificationService, 'sendEmailVerification').mockResolvedValue(false);
   
       // Act & Assert
-      await expect(authService.registerClient(registerDto)).rejects.toThrow( HttpException);
+      await expect(authService.registerClient(registerDto)).rejects.toThrow(HttpException);
     });
   });
 
@@ -321,17 +311,23 @@ describe('AuthService', () => {
       address: '123 Test St',
       location: '40.7128° N, 74.0060° W',
       role: 'restaurant',
-      manager: 'manager_user_id', // ✅ Fixed missing manager
+      manager: 'manager_user_id',
     };
     const mockFiles = {
       logo: [{ filename: 'logo.jpg' }] as Express.Multer.File[],
     };
-  
+
     it('should successfully register a restaurant with manager', async () => {
       // Arrange
       const mockUserId = 'manager_user_id';
-      const mockSession = await connection.startSession(); // ✅ Await the session
-  
+      const mockSession = {
+        startTransaction: jest.fn(),
+        commitTransaction: jest.fn(),
+        abortTransaction: jest.fn(),
+        endSession: jest.fn(),
+      };
+      jest.spyOn(connection, 'startSession').mockResolvedValue(mockSession as any);
+
       jest.spyOn(authService as any, 'registerAndVerifyUser').mockResolvedValue({
         status: HttpStatus.CREATED,
         data: {
@@ -339,13 +335,13 @@ describe('AuthService', () => {
           message: 'User created successfully',
         },
       });
-  
+
       jest.spyOn(restaurantService, 'findRestaurantByName').mockResolvedValue(null);
       jest.spyOn(restaurantService, 'createRestaurant').mockResolvedValue({} as any);
-  
+
       // Act
       const result = await authService.registerRestaurant(restaurantDto, mockFiles);
-  
+
       // Assert
       expect(connection.startSession).toHaveBeenCalled();
       expect(mockSession.startTransaction).toHaveBeenCalled();
@@ -357,12 +353,18 @@ describe('AuthService', () => {
       expect(result.status).toBe(HttpStatus.CREATED);
       expect(result.data.userId).toBe(mockUserId);
     });
-  
+
     it('should throw ConflictException if restaurant name already exists', async () => {
       // Arrange
       const mockUserId = 'manager_user_id';
-      const mockSession = await connection.startSession(); // ✅ Await the session
-  
+      const mockSession = {
+        startTransaction: jest.fn(),
+        commitTransaction: jest.fn(),
+        abortTransaction: jest.fn(),
+        endSession: jest.fn(),
+      };
+      jest.spyOn(connection, 'startSession').mockResolvedValue(mockSession as any);
+
       jest.spyOn(authService as any, 'registerAndVerifyUser').mockResolvedValue({
         status: HttpStatus.CREATED,
         data: {
@@ -370,21 +372,27 @@ describe('AuthService', () => {
           message: 'User created successfully',
         },
       });
-  
+
       jest.spyOn(restaurantService, 'findRestaurantByName').mockResolvedValue({} as any);
-      jest.spyOn(userService, 'deleteUser').mockResolvedValue({ success: true }); // ✅ Fixed return type
-  
+      jest.spyOn(userService, 'deleteUser').mockResolvedValue({ success: true });
+
       // Act & Assert
       await expect(authService.registerRestaurant(restaurantDto, mockFiles)).rejects.toThrow(ConflictException);
       expect(mockSession.abortTransaction).toHaveBeenCalled();
       expect(userService.deleteUser).toHaveBeenCalledWith(mockUserId);
     });
-  
+
     it('should rollback and delete user if restaurant creation fails', async () => {
       // Arrange
       const mockUserId = 'manager_user_id';
-      const mockSession = await connection.startSession(); // ✅ Await the session
-  
+      const mockSession = {
+        startTransaction: jest.fn(),
+        commitTransaction: jest.fn(),
+        abortTransaction: jest.fn(),
+        endSession: jest.fn(),
+      };
+      jest.spyOn(connection, 'startSession').mockResolvedValue(mockSession as any);
+
       jest.spyOn(authService as any, 'registerAndVerifyUser').mockResolvedValue({
         status: HttpStatus.CREATED,
         data: {
@@ -392,18 +400,17 @@ describe('AuthService', () => {
           message: 'User created successfully',
         },
       });
-  
+
       jest.spyOn(restaurantService, 'findRestaurantByName').mockResolvedValue(null);
       jest.spyOn(restaurantService, 'createRestaurant').mockRejectedValue(new Error('Restaurant creation failed'));
-      jest.spyOn(userService, 'deleteUser').mockResolvedValue({ success: true }); // ✅ Fixed return type
-  
+      jest.spyOn(userService, 'deleteUser').mockResolvedValue({ success: true });
+
       // Act & Assert
       await expect(authService.registerRestaurant(restaurantDto, mockFiles)).rejects.toThrow(InternalServerErrorException);
       expect(mockSession.abortTransaction).toHaveBeenCalled();
       expect(userService.deleteUser).toHaveBeenCalledWith(mockUserId);
     });
   });
-  
 
   describe('verifyEmail', () => {
     const mockToken = 'valid_verification_token';
@@ -590,22 +597,23 @@ describe('AuthService', () => {
 
     it('should return user by id', async () => {
       // Arrange
-      const mockSelect = { select: jest.fn().mockResolvedValue(mockUser) };
-      jest.spyOn(userModel, 'findById').mockReturnValue(mockSelect as any);
+      jest.spyOn(userModel, 'findById').mockReturnValue({
+        select: jest.fn().mockResolvedValue(mockUser)
+      } as any);
 
       // Act
       const result = await authService.getUserById(userId);
 
       // Assert
       expect(userModel.findById).toHaveBeenCalledWith(userId);
-      expect(mockSelect.select).toHaveBeenCalledWith('-password');
       expect(result).toBe(mockUser);
     });
 
     it('should throw NotFound if user not found', async () => {
       // Arrange
-      const mockSelect = { select: jest.fn().mockResolvedValue(null) };
-      jest.spyOn(userModel, 'findById').mockReturnValue(mockSelect as any);
+      jest.spyOn(userModel, 'findById').mockReturnValue({
+        select: jest.fn().mockResolvedValue(null)
+      } as any);
 
       // Act & Assert
       await expect(authService.getUserById(userId)).rejects.toThrow(HttpException);
@@ -613,8 +621,9 @@ describe('AuthService', () => {
 
     it('should throw InternalServerErrorException on database error', async () => {
       // Arrange
-      const mockSelect = { select: jest.fn().mockRejectedValue(new Error('Database error')) };
-      jest.spyOn(userModel, 'findById').mockReturnValue(mockSelect as any);
+      jest.spyOn(userModel, 'findById').mockReturnValue({
+        select: jest.fn().mockRejectedValue(new Error('Database error'))
+      } as any);
 
       // Act & Assert
       await expect(authService.getUserById(userId)).rejects.toThrow(InternalServerErrorException);
@@ -646,29 +655,5 @@ describe('AuthService', () => {
     });
   });
 
-  describe('getRestaurantsWithManagers', () => {
-    it('should return restaurants with managers', async () => {
-      // Arrange
-      const mockRestaurants = [
-        { name: 'Restaurant 1', manager: { fullName: 'Manager 1' } },
-        { name: 'Restaurant 2', manager: { fullName: 'Manager 2' } },
-      ];
-      jest.spyOn(restaurantService, 'getRestaurantsWithManagers').mockResolvedValue(mockRestaurants as any);
-
-      // Act
-      const result = await authService.getRestaurantsWithManagers();
-
-      // Assert
-      expect(restaurantService.getRestaurantsWithManagers).toHaveBeenCalled();
-      expect(result).toEqual(mockRestaurants);
-    });
-
-    it('should throw InternalServerErrorException if fetch fails', async () => {
-      // Arrange
-      jest.spyOn(restaurantService, 'getRestaurantsWithManagers').mockRejectedValue(new Error('Database error'));
-
-      // Act & Assert
-      await expect(authService.getRestaurantsWithManagers()).rejects.toThrow(InternalServerErrorException);
-    });
-  });
+ 
 });

@@ -47,7 +47,6 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserService } from './services/userService.service';
 
 
-
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
@@ -55,16 +54,9 @@ export class AuthController {
     private readonly userService:UserService
   ) {}
 
- 
+
 
   @Post('login')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'User login' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'User successfully logged in',
-  })
-  @ApiBody({ type: LoginDto })
   async login(
     @Body(new ValidationPipe()) loginDto: LoginDto,
     @Res({ passthrough: true }) response: Response,
@@ -73,13 +65,6 @@ export class AuthController {
   }
 
   @Post('refresh-token')
-  @HttpCode(HttpStatus.OK)
-  @Token(TokenLocation.COOKIES)
-  @ApiOperation({ summary: 'Refresh access token' })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Token successfully refreshed',
-  })
   async refreshToken(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
@@ -96,12 +81,9 @@ export class AuthController {
     return this.authService.refreshToken(refreshToken, response);
   }
 
-
   // Protected route example
   @Get('protected')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Protected route example' })
   async protectedRoute(@Req() request: Request) {
     return {
       status: HttpStatus.OK,
@@ -111,18 +93,10 @@ export class AuthController {
       },
     };
   }
+
   // register user
   @Post('register/user')
-  @ApiOperation({ summary: 'Register a new user' })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'User successfully registered',
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid input data',
-  })
-  @ApiBody({ type: RegisterDto })
+  
   async register(
     @Body(new ValidationPipe()) registerDto: RegisterDto
   ): Promise<AuthResponse> {
@@ -169,12 +143,12 @@ export class AuthController {
   }
   
   // function to verify the email
-@Get('verify-email')
-async verifyEmail(
-    @Query('token') token: string,
-): Promise<{ message: string; statusCode: number }> {
-    return this.authService.verifyEmail(token);
-}
+  @Get('verify-email')
+  async verifyEmail(
+      @Query('token') token: string,
+  ): Promise<{ message: string; statusCode: number }> {
+      return this.authService.verifyEmail(token);
+  }
 
 
 //  forget pass word 
@@ -196,48 +170,20 @@ async verifyEmail(
   }
   
 // get user by auth user
-@Get('me')
-@UseGuards(JwtAuthGuard)
-async getMe(@Req() req: Request) {
-  const user = await this.authService.getUserById(req['decoded'].sub);
-  return { status: HttpStatus.OK, data: user };
-}
-
-@Post('logout')
-@UseGuards(JwtAuthGuard)
- async logout(@Res() res: Response) {
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken');
-  return res.send({ message: 'Logged out' });
-}
-// super admin
-@Get('users')
-async getUsers() {
-  return this.userService.getUsers()    ;
-}
-
-
-
-// update user role
-@Put('users/:id/role')
-async updateUserRole(@Param('id') id: string, @Body('role') role: string) {
-  return this.userService.updateUserRole(id, role);
-}
-//  delter user
-@Delete('users/:id')
-async deleteUser(@Param('id') id: string) {
-  return this.userService.deleteUser(id);
-}
-
-
-  // Récupérer les gestionnaires de restaurants avec leurs restaurants associés :
-
-  @Get('restaurants')
-  async getRestaurantsWithManagers() {
-    return this.authService.getRestaurantsWithManagers();
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getMe(@Req() req: Request) {
+    const user = await this.authService.getUserById(req['decoded'].sub);
+    return { status: HttpStatus.OK, data: user };
   }
-  
 
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+   async logout(@Res() res: Response) {
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    return res.send({ message: 'Logged out' });
+   }
  }
 
 

@@ -22,6 +22,7 @@ export class ClientService {
   async getMyOrders(clientId: string) {
     try {
       const orders = await this.orderModel.find({ client: clientId }).exec();
+      console.log(orders);
       return orders;
     } catch (error) {
       throw new InternalServerErrorException('Failed to fetch orders.');

@@ -86,8 +86,7 @@ export class EmailVerificationService {
     try {
       const baseUrl = process.env.FRONT_APP_HOST.startsWith('http')
         ? process.env.FRONT_APP_HOST
-        : `https://${process.env.FRONT_APP_HOST}`;
-      // Use URL parameter for the token in password reset as well
+        : `http://${process.env.FRONT_APP_HOST}`;
       const link = `${baseUrl}/reset-password/${token}`;
 
       const htmlContent = `
